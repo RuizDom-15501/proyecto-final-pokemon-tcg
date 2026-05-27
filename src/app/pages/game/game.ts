@@ -9,7 +9,7 @@ import { StatsService } from '../../services/stats.service';
 import { AuthService } from '../../services/auth.service';
 import { SoundService } from '../../services/sound.service';
 import { AnimationService } from '../../services/animation.service';
-import { OnlineRoomService, GameState } from '../../services/online-room.service';
+import { OnlineRoomService, GameState, CardSnapshot, OnlineSession } from '../../services/online-room.service';
 import { GameRecord, DeckEntry } from '../../models/game-records';
 
 @Component({
@@ -93,10 +93,11 @@ export class GameComponent implements OnInit, OnDestroy {
 
   // ── Online multiplayer (opcional) ──
   // Si no hay roomId, el juego funciona normal contra CPU
-  private roomId:              string | null = null;
-  onlineRol:                   'host' | 'guest' | null = null;
+  private roomId:               string | null = null;
+  onlineRol:                    'host' | 'guest' | null = null;
   private isApplyingRemoteState = false;   // guard anti-loop
   private lastRemoteTimestamp   = 0;       // ignora estados más viejos
+  private publishTimer:         any = null; // debounce de publicarEstado
   roomCode = '';
   get isOnline(): boolean { return !!this.roomId; }
 
@@ -129,11 +130,35 @@ export class GameComponent implements OnInit, OnDestroy {
   ) {}
 
   ngOnInit(): void {
-    // Leer queryParams: ?roomId=XXX&rol=host|guest
+    // Leer queryParams: ?roomId=XXX&rol=host|guest&code=XXXXXX
     const params = this.route.snapshot.queryParamMap;
-    this.roomId    = params.get('roomId');
-    this.onlineRol = (params.get('rol') as 'host' | 'guest') ?? null;
-    this.roomCode  = params.get('code') ?? '';
+    let roomId    = params.get('roomId');
+    let rol       = params.get('rol') as 'host' | 'guest' | null;
+    let code      = params.get('code') ?? '';
+
+    // ── Bug 3: Reconexión desde localStorage si no hay queryParams ────────
+    if (!roomId) {
+      const session = this.onlineRoom.loadSession();
+      if (session) {
+        console.log('[ONLINE] reconectando desde localStorage:', session.roomId);
+        roomId = session.roomId;
+        rol    = session.onlineRol;
+        code   = session.roomCode;
+      }
+    }
+
+    this.roomId    = roomId;
+    this.onlineRol = rol;
+    this.roomCode  = code;
+
+    // Persistir sesión si hay sala
+    if (this.roomId && this.onlineRol) {
+      this.onlineRoom.saveSession({
+        roomId:    this.roomId,
+        roomCode:  this.roomCode,
+        onlineRol: this.onlineRol
+      });
+    }
 
     this.iniciarPartida();
 
@@ -143,6 +168,11 @@ export class GameComponent implements OnInit, OnDestroy {
       this.onlineRoom.subscribeToRoom(this.roomId, (state: GameState) => {
         this.aplicarEstadoRemoto(state);
       });
+
+      // ── Bug 1: Si es guest, esperar el mazo inicial del host ──────────
+      if (this.onlineRol === 'guest') {
+        this.cargarMazoDesdeHost();
+      }
     }
   }
 
@@ -153,6 +183,7 @@ export class GameComponent implements OnInit, OnDestroy {
     clearTimeout(this.attackAnimTimer);
     clearTimeout(this.flashTimer);
     clearTimeout(this.turnAnimTimer);
+    clearTimeout(this.publishTimer);
     this.limpiarOnline();
   }
 
@@ -160,11 +191,14 @@ export class GameComponent implements OnInit, OnDestroy {
   private limpiarOnline(): void {
     if (this.roomId) {
       this.onlineRoom.unsubscribe();
+      this.onlineRoom.clearSession();
       this.roomId = null;
       this.roomCode = '';
       this.onlineRol = null;
       this.isApplyingRemoteState = false;
       this.lastRemoteTimestamp = 0;
+      clearTimeout(this.publishTimer);
+      this.publishTimer = null;
     }
   }
 
@@ -248,6 +282,12 @@ export class GameComponent implements OnInit, OnDestroy {
 
     // Cargar imágenes y stats reales en segundo plano
     this.cargarCartasReales([...selJugador], [...selCpu]);
+
+    // ── Bug 1: Host publica el mazo inicial para que el guest lo cargue ──
+    if (this.isOnline && this.onlineRol === 'host') {
+      // Pequeño delay para que la suscripción del guest esté lista
+      setTimeout(() => this.publicarMazoInicial(), 1500);
+    }
   }
 
   private cargarCartasReales(
@@ -453,7 +493,8 @@ export class GameComponent implements OnInit, OnDestroy {
 
   /**
    * Online: host acaba de actuar → pasa turno al guest (turno = 'cpu').
-   * Publica el estado para que el guest lo reciba y sepa que puede actuar.
+   * NO llama publicarEstado — ya lo hizo ejecutarAtaque/Habilidad/cambiarActiva.
+   * El debounce en publicarEstado colapsa ambas llamadas en una sola.
    */
   private pasarTurnoOnlineAlGuest(): void {
     this.turno = 'cpu';
@@ -462,12 +503,12 @@ export class GameComponent implements OnInit, OnDestroy {
     this.triggerTurnChangeAnim();
     this.agregarLog(`— Ronda ${this.roundNumber} — Turno del Guest`);
     console.log('[TURN] host pasó turno al guest — turno=cpu, ronda', this.roundNumber);
-    this.publicarEstado('__turno_guest__');
+    // publicarEstado ya fue llamado por la acción — el debounce lo unifica
   }
 
   /**
    * Online: guest acaba de actuar → pasa turno al host (turno = 'jugador').
-   * Publica el estado para que el host lo reciba y sepa que puede actuar.
+   * NO llama publicarEstado — ya lo hizo ejecutarAtaque/Habilidad/cambiarActiva.
    */
   private pasarTurnoOnlineAlHost(): void {
     this.turno = 'jugador';
@@ -475,7 +516,7 @@ export class GameComponent implements OnInit, OnDestroy {
     this.triggerTurnChangeAnim();
     this.agregarLog(`— Turno del Host`);
     console.log('[TURN] guest pasó turno al host — turno=jugador');
-    this.publicarEstado('__turno_host__');
+    // publicarEstado ya fue llamado por la acción — el debounce lo unifica
   }
 
   ejecutarTurnoCPU() {
@@ -684,37 +725,139 @@ export class GameComponent implements OnInit, OnDestroy {
   //  ONLINE — Sincronización Supabase Realtime
   // ══════════════════════════════════════════
 
+  // ── Bug 1: Serializar carta a snapshot ───────────────────────────────────
+  private toSnapshot(c: PokemonCard): CardSnapshot {
+    return {
+      id: c.id, nombre: c.nombre, tipo: c.tipo,
+      hp: c.hp, vidaActual: c.vidaActual,
+      ataque: c.ataque, defensa: c.defensa, imagen: c.imagen
+    };
+  }
+
+  private fromSnapshot(s: CardSnapshot): PokemonCard {
+    return this.cartaEmergencia(s.id, s.nombre, s.tipo);
+    // cartaEmergencia ya asigna hp/atk/def por tipo; sobreescribimos con los valores reales
+    // para que coincidan exactamente con lo que generó el host
+  }
+
+  private fromSnapshotExact(s: CardSnapshot): PokemonCard {
+    const c = this.cartaEmergencia(s.id, s.nombre, s.tipo);
+    c.hp         = s.hp;
+    c.vidaActual = s.vidaActual;
+    c.ataque     = s.ataque;
+    c.defensa    = s.defensa;
+    c.imagen     = s.imagen;
+    return c;
+  }
+
+  /**
+   * Bug 1 — Host: publica el mazo inicial en game_state.initialDeck
+   * para que el guest lo cargue y ambos vean el mismo tablero.
+   */
+  private publicarMazoInicial(): void {
+    if (!this.roomId || !this.playerActive || !this.cpuActive) return;
+
+    const initialDeck = {
+      playerActive: this.toSnapshot(this.playerActive),
+      playerBench:  this.playerBench.map(c => this.toSnapshot(c)),
+      cpuActive:    this.toSnapshot(this.cpuActive),
+      cpuBench:     this.cpuBench.map(c => this.toSnapshot(c))
+    };
+
+    const state: GameState = {
+      turno:       'jugador',
+      playerLife:  this.playerLife,
+      cpuLife:     this.cpuLife,
+      roundNumber: 1,
+      lastAction:  '__initial_deck__',
+      gameOver:    false,
+      ganador:     '',
+      timestamp:   Date.now(),
+      senderRole:  'host',
+      initialDeck
+    };
+
+    console.log('[SYNC] host publicando mazo inicial');
+    this.onlineRoom.pushState(this.roomId, state);
+  }
+
+  /**
+   * Bug 1 — Guest: espera el mazo inicial del host y lo aplica.
+   * Hace polling sobre game_state hasta que initialDeck esté disponible.
+   */
+  private cargarMazoDesdeHost(): void {
+    if (!this.roomId) return;
+    console.log('[SYNC] guest esperando mazo inicial del host...');
+
+    let intentos = 0;
+    const maxIntentos = 30; // 30 × 1s = 30 segundos máximo
+
+    const poll = setInterval(async () => {
+      intentos++;
+      const { data } = await this.onlineRoom.getRoomById(this.roomId!);
+      const gs = data?.game_state as GameState | null;
+
+      if (gs?.initialDeck) {
+        clearInterval(poll);
+        console.log('[SYNC] guest recibió mazo inicial del host');
+        this.aplicarMazoInicial(gs.initialDeck);
+      } else if (intentos >= maxIntentos) {
+        clearInterval(poll);
+        console.warn('[SYNC] guest timeout esperando mazo — usando mazo local');
+      }
+    }, 1000);
+  }
+
+  private aplicarMazoInicial(deck: NonNullable<GameState['initialDeck']>): void {
+    this.playerActive = this.fromSnapshotExact(deck.playerActive);
+    this.playerBench  = deck.playerBench.map(s => this.fromSnapshotExact(s));
+    this.cpuActive    = this.fromSnapshotExact(deck.cpuActive);
+    this.cpuBench     = deck.cpuBench.map(s => this.fromSnapshotExact(s));
+    this.agregarLog('🔄 Tablero sincronizado con el host.');
+    console.log('[SYNC] mazo aplicado — playerActive:', this.playerActive?.nombre,
+      '| cpuActive:', this.cpuActive?.nombre);
+  }
+
   /**
    * Publica el estado actual del juego en Supabase.
+   * Bug 2: debounce de 80ms para evitar doble publish por acción.
    * Guard: no publicar mientras isApplyingRemoteState (anti-loop).
    */
   private publicarEstado(lastAction: string): void {
     if (!this.roomId || this.isApplyingRemoteState) return;
 
-    const state: GameState = {
-      turno:       this.turno,
-      playerLife:  this.playerLife,
-      cpuLife:     this.cpuLife,
-      roundNumber: this.roundNumber,
-      lastAction,
-      gameOver:    this.gameOver,
-      ganador:     this.gameOver ? this.authService.getUsername() : '',
-      timestamp:   Date.now(),
-      senderRole:  this.onlineRol ?? ''
-    };
+    // Cancelar publish pendiente — solo enviar el último
+    clearTimeout(this.publishTimer);
 
-    console.log('[ONLINE] publicarEstado →', lastAction,
-      '| turno:', state.turno,
-      '| rol:', state.senderRole,
-      '| ts:', state.timestamp);
+    this.publishTimer = setTimeout(() => {
+      if (!this.roomId || this.isApplyingRemoteState) return;
 
-    this.onlineRoom.pushState(this.roomId, state);
+      const state: GameState = {
+        turno:       this.turno,
+        playerLife:  this.playerLife,
+        cpuLife:     this.cpuLife,
+        roundNumber: this.roundNumber,
+        lastAction,
+        gameOver:    this.gameOver,
+        ganador:     this.gameOver ? this.authService.getUsername() : '',
+        timestamp:   Date.now(),
+        senderRole:  this.onlineRol ?? ''
+      };
+
+      console.log('[PUBLISH] publicarEstado →', lastAction,
+        '| turno:', state.turno,
+        '| rol:', state.senderRole,
+        '| ts:', state.timestamp);
+
+      this.onlineRoom.pushState(this.roomId!, state);
+    }, 80);
   }
 
   private aplicarEstadoRemoto(state: GameState): void {
     // ── Guards en orden estricto ──────────────────────────────────────────
     if (!state || state.playerLife === undefined)    return;
     if (state.lastAction === '__guest_joined__')      return;
+    if (state.lastAction === '__initial_deck__')      return; // mazo ya se aplica por polling
     if (this.isApplyingRemoteState)                  return;
     if (state.senderRole === this.onlineRol)         return;  // ignorar propios
     if (state.timestamp <= this.lastRemoteTimestamp) return;  // ignorar viejos
@@ -722,7 +865,7 @@ export class GameComponent implements OnInit, OnDestroy {
     this.isApplyingRemoteState = true;
     this.lastRemoteTimestamp   = state.timestamp;
 
-    console.log('[REMOTE STATE] recibido de', state.senderRole,
+    console.log('[REMOTE] aplicarEstadoRemoto de', state.senderRole,
       '| acción:', state.lastAction,
       '| turno remoto:', state.turno,
       '| playerLife:', state.playerLife,
@@ -739,15 +882,13 @@ export class GameComponent implements OnInit, OnDestroy {
       this.roundNumber = state.roundNumber;
 
       // ── Sincronizar turno ─────────────────────────────────────────────
-      // El turno publicado por el oponente es el turno que ELLOS establecieron
-      // después de actuar. Lo adoptamos directamente.
       const turnoAnterior = this.turno;
       this.turno = state.turno;
 
       if (turnoAnterior !== this.turno) {
         this.soundService.play('turnChange');
         this.triggerTurnChangeAnim();
-        console.log('[TURN] turno cambió remotamente:', turnoAnterior, '→', this.turno,
+        console.log('[SYNC] turno cambió remotamente:', turnoAnterior, '→', this.turno,
           '| esMiTurno:', this.esMiTurnoOnline());
       }
 
@@ -773,7 +914,9 @@ export class GameComponent implements OnInit, OnDestroy {
         }
       }
     } finally {
-      queueMicrotask(() => { this.isApplyingRemoteState = false; });
+      // Bug 2: liberar el flag con un pequeño delay para absorber
+      // cualquier evento realtime duplicado que llegue en el mismo tick
+      setTimeout(() => { this.isApplyingRemoteState = false; }, 150);
     }
   }
 

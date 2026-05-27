@@ -2,7 +2,19 @@ import { Injectable } from '@angular/core';
 import { RealtimeChannel } from '@supabase/supabase-js';
 import { supabase } from '../core/supabase';
 
-// ── Estado mínimo sincronizado entre jugadores ──────────────────────────────
+// ── Snapshot mínimo de una carta para serializar el mazo ───────────────────
+export interface CardSnapshot {
+  id:        number;
+  nombre:    string;
+  tipo:      string;
+  hp:        number;
+  vidaActual: number;
+  ataque:    number;
+  defensa:   number;
+  imagen:    string;
+}
+
+// ── Estado sincronizado entre jugadores ────────────────────────────────────
 export interface GameState {
   turno:       'jugador' | 'cpu';
   playerLife:  number;
@@ -13,6 +25,14 @@ export interface GameState {
   ganador:     string;
   timestamp:   number;   // Date.now() — ignora estados más viejos
   senderRole:  string;   // 'host' | 'guest' — ignora propios updates
+
+  // Mazo inicial — solo lo publica el host una vez al crear la sala
+  initialDeck?: {
+    playerActive: CardSnapshot;
+    playerBench:  CardSnapshot[];
+    cpuActive:    CardSnapshot;
+    cpuBench:     CardSnapshot[];
+  };
 }
 
 // ── Fila de la tabla online_rooms ───────────────────────────────────────────
@@ -26,10 +46,40 @@ export interface OnlineRoom {
   created_at: string;
 }
 
+// ── Clave localStorage ──────────────────────────────────────────────────────
+const LS_KEY = 'pokemon_online_session';
+
+export interface OnlineSession {
+  roomId:    string;
+  roomCode:  string;
+  onlineRol: 'host' | 'guest';
+}
+
 @Injectable({ providedIn: 'root' })
 export class OnlineRoomService {
 
   private channel: RealtimeChannel | null = null;
+
+  // ── Persistencia de sesión ──────────────────────────────────────────────
+  saveSession(session: OnlineSession): void {
+    localStorage.setItem(LS_KEY, JSON.stringify(session));
+    console.log('[ONLINE] sesión guardada en localStorage:', session.roomId);
+  }
+
+  loadSession(): OnlineSession | null {
+    try {
+      const raw = localStorage.getItem(LS_KEY);
+      if (!raw) return null;
+      return JSON.parse(raw) as OnlineSession;
+    } catch {
+      return null;
+    }
+  }
+
+  clearSession(): void {
+    localStorage.removeItem(LS_KEY);
+    console.log('[ONLINE] sesión eliminada de localStorage');
+  }
 
   // ── Generar código de sala de 6 caracteres ──────────────────────────────
   private generateCode(): string {
@@ -66,7 +116,6 @@ export class OnlineRoomService {
     const upperCode = code.toUpperCase().trim();
     console.log('[ONLINE] joinRoom → code:', upperCode, '| guestId:', guestId);
 
-    // 1. Buscar sala por código en estado 'waiting'
     const { data: room, error: findErr } = await supabase
       .from('online_rooms')
       .select('*')
@@ -81,7 +130,6 @@ export class OnlineRoomService {
 
     console.log('[ONLINE] joinRoom — sala encontrada:', room.id);
 
-    // 2. Registrar guest y cambiar estado a 'playing'
     const { data, error } = await supabase
       .from('online_rooms')
       .update({ guest_id: guestId, status: 'playing' })
@@ -100,7 +148,10 @@ export class OnlineRoomService {
 
   // ── Publicar estado del juego ───────────────────────────────────────────
   async pushState(roomId: string, state: Partial<GameState>): Promise<void> {
-    console.log('[ONLINE] pushState → roomId:', roomId, '| action:', state.lastAction);
+    console.log('[PUBLISH] pushState → roomId:', roomId,
+      '| action:', state.lastAction,
+      '| turno:', state.turno,
+      '| ts:', state.timestamp);
 
     const { error } = await supabase
       .from('online_rooms')
@@ -114,7 +165,7 @@ export class OnlineRoomService {
 
   // ── Suscribirse a cambios en tiempo real ────────────────────────────────
   subscribeToRoom(roomId: string, onUpdate: (state: GameState) => void): void {
-    this.unsubscribe(); // limpiar canal anterior
+    this.unsubscribe();
 
     console.log('[ONLINE] subscribeToRoom → roomId:', roomId);
 
@@ -129,11 +180,10 @@ export class OnlineRoomService {
           filter: `id=eq.${roomId}`
         },
         (payload) => {
-          console.log('[ONLINE] realtime UPDATE recibido');
           const gs = (payload.new as any)?.game_state as GameState | null;
-          if (gs) {
-            onUpdate(gs);
-          }
+          console.log('[REMOTE] realtime UPDATE recibido | senderRole:', gs?.senderRole,
+            '| action:', gs?.lastAction, '| ts:', gs?.timestamp);
+          if (gs) onUpdate(gs);
         }
       )
       .subscribe((status) => {
