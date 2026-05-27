@@ -9,7 +9,7 @@ import { StatsService } from '../../services/stats.service';
 import { AuthService } from '../../services/auth.service';
 import { SoundService } from '../../services/sound.service';
 import { AnimationService } from '../../services/animation.service';
-import { OnlineRoomService, GameState, CardSnapshot, OnlineSession } from '../../services/online-room.service';
+import { OnlineRoomService, GameState, CardSnapshot, OnlineSession, GuestIntent } from '../../services/online-room.service';
 import { GameRecord, DeckEntry } from '../../models/game-records';
 
 @Component({
@@ -390,22 +390,21 @@ export class GameComponent implements OnInit, OnDestroy {
   ejecutarAtaque() {
     if (!this.cartaSeleccionada) return;
     this.soundService.play('attack');
+    const nombre = this.cartaSeleccionada.nombre;
+    const cardId = this.cartaSeleccionada.id;
+    this.cerrarAcciones();
 
     if (this.isOnline && this.onlineRol === 'guest') {
-      // Guest: su atacante es cpuActive, su objetivo es playerActive
-      console.log('[ONLINE ACTION] guest ejecutarAtaque →', this.cartaSeleccionada.nombre);
-      this.realizarAtaque(this.cartaSeleccionada, 'cpu');
-      this.cerrarAcciones();
-      this.publicarEstado(`${this.cartaSeleccionada?.nombre ?? '?'} atacó`);
-      if (!this.gameOver) this.pasarTurnoOnlineAlHost();
+      // ── GUEST: solo envía intención — NO ejecuta lógica local ──────────
+      console.log('[ONLINE ACTION] guest → intent attack:', nombre);
+      this.enviarIntencionGuest({ type: 'attack', cardId });
     } else {
-      // Host o modo local: atacante es playerActive, objetivo es cpuActive
-      console.log('[ONLINE ACTION] host/local ejecutarAtaque →', this.cartaSeleccionada.nombre);
-      this.realizarAtaque(this.cartaSeleccionada, 'jugador');
-      this.cerrarAcciones();
+      // ── HOST / LOCAL: ejecuta lógica real ───────────────────────────────
+      console.log('[ONLINE ACTION] host/local ejecutarAtaque →', nombre);
+      this.realizarAtaque(this.cartaSeleccionada!, 'jugador');
       if (this.isOnline) {
-        this.publicarEstado(`${this.cartaSeleccionada?.nombre ?? '?'} atacó`);
         if (!this.gameOver) this.pasarTurnoOnlineAlGuest();
+        this.publicarEstadoCompleto(`${nombre} atacó`);
       } else {
         if (!this.gameOver) this.pasarTurnoCPU();
       }
@@ -415,43 +414,38 @@ export class GameComponent implements OnInit, OnDestroy {
   ejecutarHabilidad() {
     if (!this.cartaSeleccionada) return;
     this.soundService.play('ability');
+    const nombre = this.cartaSeleccionada.nombre;
+    const cardId = this.cartaSeleccionada.id;
+    this.cerrarAcciones();
 
     if (this.isOnline && this.onlineRol === 'guest') {
-      console.log('[ONLINE ACTION] guest ejecutarHabilidad →', this.cartaSeleccionada.nombre);
-      this.realizarHabilidad(this.cartaSeleccionada, 'cpu');
-      this.cerrarAcciones();
-      this.publicarEstado(`${this.cartaSeleccionada?.nombre ?? '?'} usó habilidad`);
-      if (!this.gameOver) this.pasarTurnoOnlineAlHost();
+      // ── GUEST: solo envía intención ─────────────────────────────────────
+      console.log('[ONLINE ACTION] guest → intent ability:', nombre);
+      this.enviarIntencionGuest({ type: 'ability', cardId });
     } else {
-      console.log('[ONLINE ACTION] host/local ejecutarHabilidad →', this.cartaSeleccionada.nombre);
-      this.realizarHabilidad(this.cartaSeleccionada, 'jugador');
-      this.cerrarAcciones();
+      // ── HOST / LOCAL ─────────────────────────────────────────────────────
+      console.log('[ONLINE ACTION] host/local ejecutarHabilidad →', nombre);
+      this.realizarHabilidad(this.cartaSeleccionada!, 'jugador');
       if (this.isOnline) {
-        this.publicarEstado(`${this.cartaSeleccionada?.nombre ?? '?'} usó habilidad`);
         if (!this.gameOver) this.pasarTurnoOnlineAlGuest();
+        this.publicarEstadoCompleto(`${nombre} usó habilidad`);
       } else {
         if (!this.gameOver) this.pasarTurnoCPU();
       }
     }
   }
 
-  /** Cambiar Pokémon activo desde la reserva — también pasa el turno */
+  /** Cambiar Pokémon activo desde la reserva */
   cambiarActiva(carta: PokemonCard) {
     if (!this.puedeActuarJugador()) return;
     this.soundService.play('click');
 
     if (this.isOnline && this.onlineRol === 'guest') {
-      // Guest controla el lado cpu
-      console.log('[ONLINE ACTION] guest cambiarActiva →', carta.nombre);
-      const anterior = this.cpuActive;
-      this.cpuActive = carta;
-      this.cpuBench  = this.cpuBench.filter(c => c.id !== carta.id);
-      if (anterior) this.cpuBench.push(anterior);
-      this.agregarLog(`🔄 [Guest] ${carta.nombre} entra al campo.`);
-      this.publicarEstado(`Cambió a ${carta.nombre}`);
-      if (!this.gameOver) this.pasarTurnoOnlineAlHost();
+      // ── GUEST: solo envía intención ─────────────────────────────────────
+      console.log('[ONLINE ACTION] guest → intent switch:', carta.nombre);
+      this.enviarIntencionGuest({ type: 'switch', cardId: carta.id });
     } else {
-      // Host o modo local: controla el lado jugador
+      // ── HOST / LOCAL ─────────────────────────────────────────────────────
       const anterior = this.playerActive;
       this.playerActive = carta;
       this.playerBench  = this.playerBench.filter(c => c.id !== carta.id);
@@ -462,8 +456,8 @@ export class GameComponent implements OnInit, OnDestroy {
         this.animService.cardEnterAnim(el);
       }, 50);
       if (this.isOnline) {
-        this.publicarEstado(`Cambió a ${carta.nombre}`);
         if (!this.gameOver) this.pasarTurnoOnlineAlGuest();
+        this.publicarEstadoCompleto(`Cambió a ${carta.nombre}`);
       } else {
         this.pasarTurnoCPU();
       }
@@ -481,7 +475,7 @@ export class GameComponent implements OnInit, OnDestroy {
   // ══════════════════════════════════════════
 
   pasarTurnoCPU() {
-    // En modo online NUNCA ejecutar la IA local — el "turno cpu" es el turno del guest
+    // En modo online NUNCA ejecutar la IA local
     if (this.isOnline) return;
 
     this.turno = 'cpu';
@@ -491,32 +485,23 @@ export class GameComponent implements OnInit, OnDestroy {
     this.cpuTimer = setTimeout(() => this.ejecutarTurnoCPU(), 1500);
   }
 
-  /**
-   * Online: host acaba de actuar → pasa turno al guest (turno = 'cpu').
-   * NO llama publicarEstado — ya lo hizo ejecutarAtaque/Habilidad/cambiarActiva.
-   * El debounce en publicarEstado colapsa ambas llamadas en una sola.
-   */
+  /** Host: acaba de actuar → turno del guest */
   private pasarTurnoOnlineAlGuest(): void {
     this.turno = 'cpu';
     this.roundNumber++;
     this.soundService.play('turnChange');
     this.triggerTurnChangeAnim();
     this.agregarLog(`— Ronda ${this.roundNumber} — Turno del Guest`);
-    console.log('[TURN] host pasó turno al guest — turno=cpu, ronda', this.roundNumber);
-    // publicarEstado ya fue llamado por la acción — el debounce lo unifica
+    console.log('[TURN] host → guest | turno=cpu | ronda', this.roundNumber);
   }
 
-  /**
-   * Online: guest acaba de actuar → pasa turno al host (turno = 'jugador').
-   * NO llama publicarEstado — ya lo hizo ejecutarAtaque/Habilidad/cambiarActiva.
-   */
+  /** Host: procesó acción del guest → turno del host */
   private pasarTurnoOnlineAlHost(): void {
     this.turno = 'jugador';
     this.soundService.play('turnChange');
     this.triggerTurnChangeAnim();
     this.agregarLog(`— Turno del Host`);
-    console.log('[TURN] guest pasó turno al host — turno=jugador');
-    // publicarEstado ya fue llamado por la acción — el debounce lo unifica
+    console.log('[TURN] guest → host | turno=jugador');
   }
 
   ejecutarTurnoCPU() {
@@ -722,22 +707,16 @@ export class GameComponent implements OnInit, OnDestroy {
   }
 
   // ══════════════════════════════════════════
-  //  ONLINE — Sincronización Supabase Realtime
+  //  ONLINE — Host Authoritative State
   // ══════════════════════════════════════════
 
-  // ── Bug 1: Serializar carta a snapshot ───────────────────────────────────
+  // ── Serialización de cartas ─────────────────────────────────────────────
   private toSnapshot(c: PokemonCard): CardSnapshot {
     return {
       id: c.id, nombre: c.nombre, tipo: c.tipo,
       hp: c.hp, vidaActual: c.vidaActual,
       ataque: c.ataque, defensa: c.defensa, imagen: c.imagen
     };
-  }
-
-  private fromSnapshot(s: CardSnapshot): PokemonCard {
-    return this.cartaEmergencia(s.id, s.nombre, s.tipo);
-    // cartaEmergencia ya asigna hp/atk/def por tipo; sobreescribimos con los valores reales
-    // para que coincidan exactamente con lo que generó el host
   }
 
   private fromSnapshotExact(s: CardSnapshot): PokemonCard {
@@ -750,114 +729,180 @@ export class GameComponent implements OnInit, OnDestroy {
     return c;
   }
 
-  /**
-   * Bug 1 — Host: publica el mazo inicial en game_state.initialDeck
-   * para que el guest lo cargue y ambos vean el mismo tablero.
-   */
+  // ── Host: publica estado completo (cartas + vida + turno) ───────────────
+  private publicarEstadoCompleto(lastAction: string): void {
+    if (!this.roomId || this.isApplyingRemoteState) return;
+
+    clearTimeout(this.publishTimer);
+    this.publishTimer = setTimeout(() => {
+      if (!this.roomId || this.isApplyingRemoteState) return;
+
+      const state: GameState = {
+        turno:        this.turno,
+        roundNumber:  this.roundNumber,
+        playerLife:   this.playerLife,
+        cpuLife:      this.cpuLife,
+        playerActive: this.playerActive ? this.toSnapshot(this.playerActive) : null,
+        playerBench:  this.playerBench.map(c => this.toSnapshot(c)),
+        cpuActive:    this.cpuActive    ? this.toSnapshot(this.cpuActive)    : null,
+        cpuBench:     this.cpuBench.map(c => this.toSnapshot(c)),
+        lastAction,
+        gameOver:     this.gameOver,
+        ganador:      this.gameOver ? this.authService.getUsername() : '',
+        timestamp:    Date.now(),
+        senderRole:   'host'
+      };
+
+      console.log('[PUBLISH] host → estado completo | action:', lastAction,
+        '| turno:', state.turno, '| ts:', state.timestamp);
+
+      this.onlineRoom.pushState(this.roomId!, state);
+    }, 80);
+  }
+
+  // ── Guest: envía intención al host (no modifica estado local) ───────────
+  private enviarIntencionGuest(intent: GuestIntent): void {
+    if (!this.roomId) return;
+
+    const state: GameState = {
+      turno:        this.turno,
+      roundNumber:  this.roundNumber,
+      playerLife:   this.playerLife,
+      cpuLife:      this.cpuLife,
+      playerActive: this.playerActive ? this.toSnapshot(this.playerActive) : null,
+      playerBench:  this.playerBench.map(c => this.toSnapshot(c)),
+      cpuActive:    this.cpuActive    ? this.toSnapshot(this.cpuActive)    : null,
+      cpuBench:     this.cpuBench.map(c => this.toSnapshot(c)),
+      lastAction:   `__intent_${intent.type}__`,
+      gameOver:     false,
+      ganador:      '',
+      timestamp:    Date.now(),
+      senderRole:   'guest',
+      guestIntent:  intent
+    };
+
+    console.log('[PUBLISH] guest → intent:', intent.type, '| cardId:', intent.cardId);
+    this.onlineRoom.pushState(this.roomId, state);
+  }
+
+  // ── Host: publica mazo inicial ──────────────────────────────────────────
   private publicarMazoInicial(): void {
     if (!this.roomId || !this.playerActive || !this.cpuActive) return;
 
-    const initialDeck = {
+    const state: GameState = {
+      turno:        'jugador',
+      roundNumber:  1,
+      playerLife:   this.playerLife,
+      cpuLife:      this.cpuLife,
       playerActive: this.toSnapshot(this.playerActive),
       playerBench:  this.playerBench.map(c => this.toSnapshot(c)),
       cpuActive:    this.toSnapshot(this.cpuActive),
-      cpuBench:     this.cpuBench.map(c => this.toSnapshot(c))
-    };
-
-    const state: GameState = {
-      turno:       'jugador',
-      playerLife:  this.playerLife,
-      cpuLife:     this.cpuLife,
-      roundNumber: 1,
-      lastAction:  '__initial_deck__',
-      gameOver:    false,
-      ganador:     '',
-      timestamp:   Date.now(),
-      senderRole:  'host',
-      initialDeck
+      cpuBench:     this.cpuBench.map(c => this.toSnapshot(c)),
+      lastAction:   '__initial_deck__',
+      gameOver:     false,
+      ganador:      '',
+      timestamp:    Date.now(),
+      senderRole:   'host',
+      initialDeck: {
+        playerActive: this.toSnapshot(this.playerActive),
+        playerBench:  this.playerBench.map(c => this.toSnapshot(c)),
+        cpuActive:    this.toSnapshot(this.cpuActive),
+        cpuBench:     this.cpuBench.map(c => this.toSnapshot(c))
+      }
     };
 
     console.log('[SYNC] host publicando mazo inicial');
     this.onlineRoom.pushState(this.roomId, state);
   }
 
-  /**
-   * Bug 1 — Guest: espera el mazo inicial del host y lo aplica.
-   * Hace polling sobre game_state hasta que initialDeck esté disponible.
-   */
+  // ── Guest: polling para cargar mazo inicial del host ────────────────────
   private cargarMazoDesdeHost(): void {
     if (!this.roomId) return;
-    console.log('[SYNC] guest esperando mazo inicial del host...');
+    console.log('[SYNC] guest esperando mazo inicial...');
 
     let intentos = 0;
-    const maxIntentos = 30; // 30 × 1s = 30 segundos máximo
-
     const poll = setInterval(async () => {
       intentos++;
       const { data } = await this.onlineRoom.getRoomById(this.roomId!);
       const gs = data?.game_state as GameState | null;
 
-      if (gs?.initialDeck) {
+      if (gs?.initialDeck && gs.playerActive && gs.cpuActive) {
         clearInterval(poll);
-        console.log('[SYNC] guest recibió mazo inicial del host');
-        this.aplicarMazoInicial(gs.initialDeck);
-      } else if (intentos >= maxIntentos) {
+        console.log('[SYNC] guest recibió mazo inicial');
+        this.aplicarSnapshotCompleto(gs);
+        this.agregarLog('🔄 Tablero sincronizado con el host.');
+      } else if (intentos >= 30) {
         clearInterval(poll);
-        console.warn('[SYNC] guest timeout esperando mazo — usando mazo local');
+        console.warn('[SYNC] timeout esperando mazo — usando mazo local');
       }
     }, 1000);
   }
 
-  private aplicarMazoInicial(deck: NonNullable<GameState['initialDeck']>): void {
-    this.playerActive = this.fromSnapshotExact(deck.playerActive);
-    this.playerBench  = deck.playerBench.map(s => this.fromSnapshotExact(s));
-    this.cpuActive    = this.fromSnapshotExact(deck.cpuActive);
-    this.cpuBench     = deck.cpuBench.map(s => this.fromSnapshotExact(s));
-    this.agregarLog('🔄 Tablero sincronizado con el host.');
-    console.log('[SYNC] mazo aplicado — playerActive:', this.playerActive?.nombre,
-      '| cpuActive:', this.cpuActive?.nombre);
+  // ── Reconstruir tablero desde snapshot del host ─────────────────────────
+  private aplicarSnapshotCompleto(state: GameState): void {
+    if (state.playerActive) {
+      this.playerActive = this.fromSnapshotExact(state.playerActive);
+    } else {
+      this.playerActive = null;
+    }
+    this.playerBench = (state.playerBench ?? []).map(s => this.fromSnapshotExact(s));
+
+    if (state.cpuActive) {
+      this.cpuActive = this.fromSnapshotExact(state.cpuActive);
+    } else {
+      this.cpuActive = null;
+    }
+    this.cpuBench = (state.cpuBench ?? []).map(s => this.fromSnapshotExact(s));
+
+    this.playerLife  = state.playerLife;
+    this.cpuLife     = state.cpuLife;
+    this.roundNumber = state.roundNumber;
+    this.turno       = state.turno;
+
+    console.log('[SYNC] snapshot aplicado | playerActive:', this.playerActive?.nombre,
+      '| cpuActive:', this.cpuActive?.nombre,
+      '| playerLife:', this.playerLife, '| cpuLife:', this.cpuLife);
   }
 
-  /**
-   * Publica el estado actual del juego en Supabase.
-   * Bug 2: debounce de 80ms para evitar doble publish por acción.
-   * Guard: no publicar mientras isApplyingRemoteState (anti-loop).
-   */
-  private publicarEstado(lastAction: string): void {
-    if (!this.roomId || this.isApplyingRemoteState) return;
+  // ── Host: procesa intención del guest y ejecuta la acción ───────────────
+  private procesarIntencionGuest(intent: GuestIntent): void {
+    console.log('[SYNC] host procesando intent del guest:', intent.type, '| cardId:', intent.cardId);
 
-    // Cancelar publish pendiente — solo enviar el último
-    clearTimeout(this.publishTimer);
+    if (intent.type === 'attack') {
+      // La carta del guest es cpuActive (el guest controla el lado cpu)
+      if (this.cpuActive && this.cpuActive.id === intent.cardId) {
+        this.realizarAtaque(this.cpuActive, 'cpu');
+      } else {
+        // Buscar en bench por si cambió
+        const carta = this.cpuBench.find(c => c.id === intent.cardId) ?? this.cpuActive;
+        if (carta) this.realizarAtaque(carta, 'cpu');
+      }
+    } else if (intent.type === 'ability') {
+      const carta = this.cpuActive?.id === intent.cardId
+        ? this.cpuActive
+        : this.cpuBench.find(c => c.id === intent.cardId) ?? this.cpuActive;
+      if (carta) this.realizarHabilidad(carta, 'cpu');
+    } else if (intent.type === 'switch') {
+      const nueva = this.cpuBench.find(c => c.id === intent.cardId);
+      if (nueva) {
+        const anterior = this.cpuActive;
+        this.cpuActive = nueva;
+        this.cpuBench  = this.cpuBench.filter(c => c.id !== nueva.id);
+        if (anterior) this.cpuBench.push(anterior);
+        this.agregarLog(`🔄 [Guest] ${nueva.nombre} entra al campo.`);
+      }
+    }
 
-    this.publishTimer = setTimeout(() => {
-      if (!this.roomId || this.isApplyingRemoteState) return;
-
-      const state: GameState = {
-        turno:       this.turno,
-        playerLife:  this.playerLife,
-        cpuLife:     this.cpuLife,
-        roundNumber: this.roundNumber,
-        lastAction,
-        gameOver:    this.gameOver,
-        ganador:     this.gameOver ? this.authService.getUsername() : '',
-        timestamp:   Date.now(),
-        senderRole:  this.onlineRol ?? ''
-      };
-
-      console.log('[PUBLISH] publicarEstado →', lastAction,
-        '| turno:', state.turno,
-        '| rol:', state.senderRole,
-        '| ts:', state.timestamp);
-
-      this.onlineRoom.pushState(this.roomId!, state);
-    }, 80);
+    this.verificarGanador();
+    this.pasarTurnoOnlineAlHost();
+    this.publicarEstadoCompleto(`[Guest] ${intent.type}`);
   }
 
+  // ── Receptor de eventos realtime ────────────────────────────────────────
   private aplicarEstadoRemoto(state: GameState): void {
-    // ── Guards en orden estricto ──────────────────────────────────────────
+    // Guards
     if (!state || state.playerLife === undefined)    return;
     if (state.lastAction === '__guest_joined__')      return;
-    if (state.lastAction === '__initial_deck__')      return; // mazo ya se aplica por polling
     if (this.isApplyingRemoteState)                  return;
     if (state.senderRole === this.onlineRol)         return;  // ignorar propios
     if (state.timestamp <= this.lastRemoteTimestamp) return;  // ignorar viejos
@@ -865,59 +910,64 @@ export class GameComponent implements OnInit, OnDestroy {
     this.isApplyingRemoteState = true;
     this.lastRemoteTimestamp   = state.timestamp;
 
-    console.log('[REMOTE] aplicarEstadoRemoto de', state.senderRole,
-      '| acción:', state.lastAction,
-      '| turno remoto:', state.turno,
-      '| playerLife:', state.playerLife,
-      '| cpuLife:', state.cpuLife);
+    console.log('[REMOTE] de', state.senderRole,
+      '| action:', state.lastAction,
+      '| turno:', state.turno,
+      '| playerLife:', state.playerLife, '| cpuLife:', state.cpuLife);
 
     try {
-      // Efectos visuales de daño ANTES de actualizar HP
-      const dmgPlayer = state.playerLife < this.playerLife ? this.playerLife - state.playerLife : 0;
-      const dmgCpu    = state.cpuLife    < this.cpuLife    ? this.cpuLife    - state.cpuLife    : 0;
+      // ── HOST recibe intención del guest → procesa y publica ─────────────
+      if (this.onlineRol === 'host' && state.guestIntent) {
+        // Liberar flag antes de procesar (procesarIntencionGuest llama publicarEstadoCompleto)
+        this.isApplyingRemoteState = false;
+        this.procesarIntencionGuest(state.guestIntent);
+        return;
+      }
 
-      // Aplicar cambios de estado
-      this.playerLife  = state.playerLife;
-      this.cpuLife     = state.cpuLife;
-      this.roundNumber = state.roundNumber;
+      // ── GUEST recibe estado completo del host → aplica snapshot ─────────
+      if (this.onlineRol === 'guest' && state.senderRole === 'host') {
+        // Ignorar mensajes de mazo inicial (ya se aplican por polling)
+        if (state.lastAction === '__initial_deck__') return;
 
-      // ── Sincronizar turno ─────────────────────────────────────────────
-      const turnoAnterior = this.turno;
-      this.turno = state.turno;
+        // Efectos visuales de daño
+        const dmgPlayer = state.playerLife < this.playerLife ? this.playerLife - state.playerLife : 0;
+        const dmgCpu    = state.cpuLife    < this.cpuLife    ? this.cpuLife    - state.cpuLife    : 0;
 
-      if (turnoAnterior !== this.turno) {
+        this.aplicarSnapshotCompleto(state);
+
+        // Animaciones
+        if (dmgPlayer > 0) this.triggerDamageEffect(dmgPlayer, 'player');
+        if (dmgCpu    > 0) this.triggerDamageEffect(dmgCpu,    'cpu');
+
+        if (state.lastAction &&
+            !state.lastAction.startsWith('__')) {
+          this.agregarLog(`🌐 [Host] ${state.lastAction}`);
+        }
+
+        // Cambio de turno
         this.soundService.play('turnChange');
         this.triggerTurnChangeAnim();
-        console.log('[SYNC] turno cambió remotamente:', turnoAnterior, '→', this.turno,
+        console.log('[SYNC] guest aplicó estado del host | turno:', this.turno,
           '| esMiTurno:', this.esMiTurnoOnline());
-      }
 
-      // Log de la acción del oponente (omitir mensajes internos de turno)
-      if (state.lastAction &&
-          state.lastAction !== '__turno_guest__' &&
-          state.lastAction !== '__turno_host__') {
-        const rol = state.senderRole === 'host' ? 'Host' : 'Guest';
-        this.agregarLog(`🌐 [${rol}] ${state.lastAction}`);
-      }
-
-      if (dmgPlayer > 0) this.triggerDamageEffect(dmgPlayer, 'player');
-      if (dmgCpu    > 0) this.triggerDamageEffect(dmgCpu,    'cpu');
-
-      // Fin de partida remoto
-      if (state.gameOver && !this.gameOver) {
-        const miUsername = this.authService.getUsername();
-        const ganamos    = state.ganador !== '' && state.ganador !== miUsername;
-        if (ganamos) {
-          this.terminarJuego('victoria', '🏆 ¡VICTORIA! Tu oponente fue derrotado.');
-        } else {
-          this.terminarJuego('derrota', '💀 DERROTA — Tu oponente ganó.');
+        // Fin de partida
+        if (state.gameOver && !this.gameOver) {
+          const miUsername = this.authService.getUsername();
+          const ganamos    = state.ganador !== '' && state.ganador !== miUsername;
+          this.terminarJuego(
+            ganamos ? 'victoria' : 'derrota',
+            ganamos ? '🏆 ¡VICTORIA! Tu oponente fue derrotado.' : '💀 DERROTA — Tu oponente ganó.'
+          );
         }
       }
     } finally {
-      // Bug 2: liberar el flag con un pequeño delay para absorber
-      // cualquier evento realtime duplicado que llegue en el mismo tick
       setTimeout(() => { this.isApplyingRemoteState = false; }, 150);
     }
+  }
+
+  // ── Compatibilidad: publicarEstado (alias para host) ────────────────────
+  private publicarEstado(lastAction: string): void {
+    this.publicarEstadoCompleto(lastAction);
   }
 
   private guardarPartidaEnSupabase(resultado: 'victoria' | 'derrota' | 'empate') {
