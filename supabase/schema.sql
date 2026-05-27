@@ -109,12 +109,10 @@ CREATE TABLE IF NOT EXISTS public.partidas (
 
 ALTER TABLE public.partidas ENABLE ROW LEVEL SECURITY;
 
--- Cualquiera puede insertar (incluso sin cuenta)
 CREATE POLICY "partidas_insert_all"
   ON public.partidas FOR INSERT
   WITH CHECK (true);
 
--- Solo el dueño puede leer sus partidas
 CREATE POLICY "partidas_select_own"
   ON public.partidas FOR SELECT
   USING (
@@ -145,7 +143,7 @@ CREATE POLICY "estadisticas_update_own"
   ON public.estadisticas FOR UPDATE
   USING (auth.uid() = user_id);
 
--- Vista pública para el ranking (solo victorias y winrate)
+-- Vista pública para el ranking
 CREATE OR REPLACE VIEW public.ranking_publico AS
   SELECT
     e.user_id,
@@ -188,7 +186,7 @@ CREATE POLICY "queue_delete_own"
   ON public.matchmaking_queue FOR DELETE
   USING (auth.uid() = user_id);
 
--- ── 7. BATTLE_LOGS (legacy) ───────────────
+-- ── 7. BATTLE_LOGS ────────────────────────
 CREATE TABLE IF NOT EXISTS public.battle_logs (
   id         UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   game_id    UUID REFERENCES public.partidas(id) ON DELETE CASCADE,
@@ -216,7 +214,7 @@ CREATE POLICY "battle_logs_select_own"
     )
   );
 
--- ── 8. PLAYERS (tabla legacy para compatibilidad) ──
+-- ── 8. PLAYERS (legacy) ───────────────────
 CREATE TABLE IF NOT EXISTS public.players (
   id         UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   username   TEXT NOT NULL UNIQUE,
@@ -242,7 +240,7 @@ CREATE POLICY "players_update_all"
   ON public.players FOR UPDATE
   USING (true);
 
--- ── 9. GAME_RECORDS (tabla legacy) ────────
+-- ── 9. GAME_RECORDS (legacy) ──────────────
 CREATE TABLE IF NOT EXISTS public.game_records (
   id                UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   player_username   TEXT,
@@ -267,11 +265,69 @@ CREATE POLICY "game_records_select_all"
   ON public.game_records FOR SELECT
   USING (true);
 
--- ── 10. REALTIME — habilitar tablas ───────
--- Ejecutar en Supabase Dashboard → Database → Replication
--- O con estos comandos:
+-- ══════════════════════════════════════════
+--  10. ONLINE_ROOMS — SALAS MULTIJUGADOR
+-- ══════════════════════════════════════════
+
+CREATE TABLE IF NOT EXISTS public.online_rooms (
+  id         UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  code       TEXT NOT NULL UNIQUE,
+  host_id    TEXT NOT NULL,
+  guest_id   TEXT,
+  status     TEXT NOT NULL DEFAULT 'waiting'
+             CHECK (status IN ('waiting', 'playing', 'finished')),
+  game_state JSONB,
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- Índice para búsqueda rápida por código
+CREATE INDEX IF NOT EXISTS idx_online_rooms_code
+  ON public.online_rooms (code);
+
+-- Índice para búsqueda por status
+CREATE INDEX IF NOT EXISTS idx_online_rooms_status
+  ON public.online_rooms (status);
+
+-- ── RLS para online_rooms ─────────────────
+ALTER TABLE public.online_rooms ENABLE ROW LEVEL SECURITY;
+
+-- Cualquier usuario autenticado puede leer salas
+CREATE POLICY "online_rooms_select_authenticated"
+  ON public.online_rooms FOR SELECT
+  TO authenticated
+  USING (true);
+
+-- Cualquier usuario autenticado puede crear salas
+CREATE POLICY "online_rooms_insert_authenticated"
+  ON public.online_rooms FOR INSERT
+  TO authenticated
+  WITH CHECK (true);
+
+-- Cualquier usuario autenticado puede actualizar salas
+-- (host actualiza game_state, guest actualiza guest_id)
+CREATE POLICY "online_rooms_update_authenticated"
+  ON public.online_rooms FOR UPDATE
+  TO authenticated
+  USING (true)
+  WITH CHECK (true);
+
+-- ── Replica Identity FULL para Realtime ───
+-- Necesario para que postgres_changes envíe el payload completo
+ALTER TABLE public.online_rooms REPLICA IDENTITY FULL;
+
+-- ── Habilitar Realtime para online_rooms ──
+ALTER PUBLICATION supabase_realtime ADD TABLE public.online_rooms;
+
+-- ── Habilitar Realtime para otras tablas ──
 ALTER PUBLICATION supabase_realtime ADD TABLE public.matchmaking_queue;
 ALTER PUBLICATION supabase_realtime ADD TABLE public.partidas;
+
+-- ── Limpieza automática de salas viejas (opcional) ────────────────────────
+-- Elimina salas terminadas o abandonadas con más de 2 horas
+-- Puedes crear un cron job en Supabase con esta query:
+-- DELETE FROM public.online_rooms
+--   WHERE created_at < NOW() - INTERVAL '2 hours'
+--     AND status IN ('finished', 'waiting');
 
 -- ══════════════════════════════════════════
 --  FIN DEL SCHEMA

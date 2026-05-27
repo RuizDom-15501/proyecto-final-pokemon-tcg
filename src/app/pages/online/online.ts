@@ -114,9 +114,11 @@ export class OnlineComponent implements OnDestroy {
 
   // ── Polling simple para detectar guest (fallback al Realtime) ────────────
   private pollForGuest(roomId: string): void {
+    let navigated = false;
     const interval = setInterval(async () => {
       const { data } = await this.roomService.getRoomById(roomId);
-      if (data?.guest_id && data?.estado === 'jugando') {
+      if (data?.guest_id && data?.status === 'playing' && !navigated) {
+        navigated = true;
         clearInterval(interval);
         this.irAlJuego(roomId, 'host');
       }
