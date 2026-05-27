@@ -1,0 +1,303 @@
+.deck-wrapper {
+  min-height: 100vh;
+  background: linear-gradient(180deg, #050a14 0%, #080d1a 100%);
+  position: relative;
+  overflow: hidden;
+}
+
+.deck-bg {
+  position: absolute; inset: 0; pointer-events: none;
+  background:
+    radial-gradient(ellipse at 20% 50%, rgba(201,162,39,0.05) 0%, transparent 50%),
+    radial-gradient(ellipse at 80% 50%, rgba(46,213,115,0.04) 0%, transparent 50%);
+}
+
+.deck-layout {
+  position: relative; z-index: 2;
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  gap: 16px;
+  padding: 20px;
+  min-height: 100vh;
+  max-width: 1400px;
+  margin: 0 auto;
+}
+
+/* ── Paneles ── */
+.panel {
+  background: rgba(10,15,30,0.9);
+  border: 1px solid rgba(255,255,255,0.08);
+  border-radius: 16px;
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  overflow: hidden;
+}
+
+.panel-header {
+  display: flex; align-items: center; justify-content: space-between;
+  padding-bottom: 10px;
+  border-bottom: 1px solid rgba(255,255,255,0.06);
+}
+
+.panel-header h2 {
+  font-size: 1rem; color: #c9a227; letter-spacing: 1px;
+  font-family: 'Cinzel', serif;
+}
+
+.panel-count {
+  font-size: 0.75rem; color: #7a8aaa;
+  background: rgba(255,255,255,0.05);
+  padding: 2px 8px; border-radius: 10px;
+}
+
+/* ── Grid de Pokémon disponibles ── */
+.pokemon-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(100px, 1fr));
+  gap: 8px;
+  overflow-y: auto;
+  max-height: calc(100vh - 160px);
+  padding-right: 4px;
+}
+
+.pokemon-grid::-webkit-scrollbar { width: 4px; }
+.pokemon-grid::-webkit-scrollbar-track { background: transparent; }
+.pokemon-grid::-webkit-scrollbar-thumb { background: rgba(201,162,39,0.3); border-radius: 2px; }
+
+.poke-card {
+  background: rgba(255,255,255,0.04);
+  border: 1px solid rgba(255,255,255,0.08);
+  border-radius: 10px;
+  padding: 8px 6px;
+  cursor: pointer;
+  position: relative;
+  overflow: hidden;
+  transition: transform 0.2s, border-color 0.2s, box-shadow 0.2s;
+  display: flex; flex-direction: column; align-items: center; gap: 4px;
+}
+
+.poke-card:hover {
+  transform: translateY(-4px);
+  border-color: rgba(201,162,39,0.5);
+  box-shadow: 0 6px 20px rgba(201,162,39,0.15);
+}
+
+.poke-type-bar {
+  position: absolute; top: 0; left: 0; right: 0; height: 3px;
+  border-radius: 10px 10px 0 0;
+}
+
+.poke-card img {
+  width: 64px; height: 64px; object-fit: contain;
+  filter: drop-shadow(0 2px 6px rgba(0,0,0,0.5));
+}
+
+.poke-info { display: flex; flex-direction: column; align-items: center; gap: 2px; width: 100%; }
+
+.poke-name {
+  font-size: 0.65rem; font-weight: 700; color: #e8d5a3;
+  text-align: center; overflow: hidden; text-overflow: ellipsis;
+  white-space: nowrap; width: 100%;
+}
+
+.poke-type {
+  font-size: 0.55rem; padding: 1px 6px; border-radius: 8px;
+  color: #fff; font-weight: 700; text-transform: uppercase;
+}
+
+.poke-stats {
+  display: flex; gap: 6px; font-size: 0.6rem; color: #7a8aaa;
+}
+
+.poke-add-hint {
+  position: absolute; inset: 0;
+  background: rgba(201,162,39,0.15);
+  display: flex; align-items: center; justify-content: center;
+  font-size: 0.75rem; font-weight: 700; color: #c9a227;
+  opacity: 0; transition: opacity 0.2s;
+  border-radius: 10px;
+}
+
+.poke-card:hover .poke-add-hint { opacity: 1; }
+
+/* ── Editor de mazo ── */
+.deck-name-row { display: flex; gap: 8px; }
+
+.deck-name-input {
+  flex: 1;
+  background: rgba(255,255,255,0.05);
+  border: 1px solid rgba(255,255,255,0.1);
+  border-radius: 8px;
+  padding: 10px 12px;
+  color: #e8d5a3;
+  font-size: 0.9rem;
+  outline: none;
+  transition: border-color 0.2s;
+}
+
+.deck-name-input:focus { border-color: rgba(201,162,39,0.5); }
+.deck-name-input::placeholder { color: #3a4a6a; }
+
+.deck-msg {
+  padding: 8px 12px; border-radius: 8px;
+  font-size: 0.82rem; text-align: center;
+}
+
+.msg-ok    { background: rgba(46,213,115,0.1); color: #2ed573; border: 1px solid rgba(46,213,115,0.3); }
+.msg-error { background: rgba(255,71,87,0.1);  color: #ff4757; border: 1px solid rgba(255,71,87,0.3); }
+
+.deck-empty {
+  display: flex; flex-direction: column; align-items: center; gap: 8px;
+  padding: 32px 16px; color: #3a4a6a; text-align: center;
+}
+
+.deck-empty span { font-size: 2rem; }
+.deck-empty p    { font-size: 0.82rem; }
+
+.deck-cards-list {
+  display: flex; flex-direction: column; gap: 6px;
+  overflow-y: auto; max-height: calc(100vh - 320px);
+}
+
+.deck-cards-list::-webkit-scrollbar { width: 4px; }
+.deck-cards-list::-webkit-scrollbar-thumb { background: rgba(201,162,39,0.3); border-radius: 2px; }
+
+.deck-entry {
+  display: flex; align-items: center; gap: 10px;
+  background: rgba(255,255,255,0.04);
+  border: 1px solid rgba(255,255,255,0.07);
+  border-radius: 8px; padding: 8px 10px;
+  transition: border-color 0.2s;
+}
+
+.deck-entry:hover { border-color: rgba(255,71,87,0.3); }
+
+.deck-entry img { width: 44px; height: 44px; object-fit: contain; flex-shrink: 0; }
+
+.deck-entry-info { display: flex; flex-direction: column; gap: 3px; flex: 1; min-width: 0; }
+
+.deck-entry-name {
+  font-size: 0.82rem; font-weight: 700; color: #e8d5a3;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+
+.deck-entry-type {
+  font-size: 0.6rem; padding: 1px 6px; border-radius: 8px;
+  color: #fff; font-weight: 700; text-transform: uppercase;
+  align-self: flex-start;
+}
+
+.deck-entry-stats { display: flex; flex-direction: column; gap: 2px; font-size: 0.68rem; color: #7a8aaa; }
+
+.remove-btn {
+  background: rgba(255,71,87,0.1); color: #ff4757;
+  border: 1px solid rgba(255,71,87,0.3);
+  border-radius: 6px; padding: 4px 8px;
+  cursor: pointer; font-size: 0.75rem;
+  transition: background 0.2s;
+  flex-shrink: 0;
+}
+
+.remove-btn:hover { background: rgba(255,71,87,0.25); }
+
+.deck-actions { display: flex; gap: 8px; flex-wrap: wrap; margin-top: auto; }
+
+.deck-btn {
+  flex: 1; min-width: 80px;
+  padding: 10px 12px; border: none; border-radius: 8px;
+  font-size: 0.85rem; font-weight: 700; cursor: pointer;
+  transition: transform 0.15s, opacity 0.2s;
+  display: flex; align-items: center; justify-content: center; gap: 6px;
+}
+
+.deck-btn:hover:not(:disabled) { transform: translateY(-2px); }
+.deck-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+
+.btn-save  { background: linear-gradient(135deg, #c9a227, #f9ca24); color: #050a14; }
+.btn-clear { background: rgba(255,71,87,0.15); color: #ff4757; border: 1px solid rgba(255,71,87,0.3); }
+.btn-back  { background: rgba(255,255,255,0.06); color: #a8b2d8; border: 1px solid rgba(255,255,255,0.1); }
+
+/* ── Mazos guardados ── */
+.refresh-btn {
+  background: none; border: none; cursor: pointer;
+  font-size: 1rem; color: #7a8aaa;
+  transition: transform 0.3s;
+}
+
+.refresh-btn:hover { transform: rotate(180deg); color: #c9a227; }
+
+.auth-hint {
+  display: flex; flex-direction: column; align-items: center; gap: 8px;
+  padding: 32px 16px; color: #3a4a6a; text-align: center;
+}
+
+.auth-hint span { font-size: 2rem; }
+.auth-hint p    { font-size: 0.82rem; }
+
+.saved-decks-list {
+  display: flex; flex-direction: column; gap: 8px;
+  overflow-y: auto; max-height: calc(100vh - 160px);
+}
+
+.saved-deck-card {
+  background: rgba(255,255,255,0.04);
+  border: 1px solid rgba(255,255,255,0.08);
+  border-radius: 10px; padding: 12px;
+  display: flex; flex-direction: column; gap: 8px;
+  transition: border-color 0.2s;
+}
+
+.saved-deck-card:hover { border-color: rgba(201,162,39,0.3); }
+
+.saved-deck-header { display: flex; align-items: center; justify-content: space-between; }
+
+.saved-deck-name { font-size: 0.9rem; font-weight: 700; color: #e8d5a3; }
+
+.saved-deck-count { font-size: 0.7rem; color: #7a8aaa; }
+
+.saved-deck-types { display: flex; gap: 4px; flex-wrap: wrap; }
+
+.mini-type {
+  font-size: 0.55rem; padding: 1px 5px; border-radius: 6px;
+  color: #fff; font-weight: 700; text-transform: uppercase;
+}
+
+.saved-deck-actions { display: flex; gap: 6px; }
+
+.sd-btn {
+  padding: 5px 12px; border: none; border-radius: 6px;
+  font-size: 0.78rem; font-weight: 700; cursor: pointer;
+  transition: transform 0.15s;
+}
+
+.sd-btn:hover { transform: translateY(-1px); }
+
+.sd-load   { background: rgba(201,162,39,0.15); color: #c9a227; border: 1px solid rgba(201,162,39,0.3); flex: 1; }
+.sd-delete { background: rgba(255,71,87,0.1);  color: #ff4757; border: 1px solid rgba(255,71,87,0.3); }
+
+/* ── Loading ── */
+.loading-row {
+  display: flex; align-items: center; gap: 10px;
+  color: #7a8aaa; font-size: 0.82rem; padding: 12px 0;
+}
+
+.mini-spinner {
+  width: 16px; height: 16px;
+  border: 2px solid rgba(201,162,39,0.2);
+  border-top-color: #c9a227;
+  border-radius: 50%;
+  animation: spin 0.7s linear infinite;
+  flex-shrink: 0;
+}
+
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* ── Responsive ── */
+@media (max-width: 900px) {
+  .deck-layout { grid-template-columns: 1fr; }
+  .pokemon-grid { max-height: 300px; }
+  .deck-cards-list { max-height: 250px; }
+  .saved-decks-list { max-height: 300px; }
+}

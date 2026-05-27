@@ -1,0 +1,9 @@
+/* Espacio para el navbar fijo (altura ~52px) */
+.app-main {
+  padding-top: 52px;
+}
+
+/* El juego ocupa pantalla completa — anula el padding en /game */
+.app-main:has(app-game) {
+  padding-top: 0;
+}

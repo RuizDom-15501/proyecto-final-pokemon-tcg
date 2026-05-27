@@ -1,0 +1,58 @@
+<div class="online-wrapper">
+  <div class="online-orb"></div>
+
+  <div class="online-content">
+    <div class="online-icon">🌐</div>
+    <h1 class="online-title">Modo Online</h1>
+
+    @if (!authService.isAuthenticated()) {
+      <p class="online-sub">Inicia sesión para jugar online</p>
+      <button class="action-btn btn-login" (click)="goHome()">🔐 Ir al Login</button>
+
+    } @else if (vista() === 'menu') {
+      <!-- ── MENÚ PRINCIPAL ── -->
+      <p class="online-sub">Bienvenido, <strong>{{ authService.getUsername() }}</strong></p>
+
+      @if (error()) {
+        <div class="online-error">⚠️ {{ error() }}</div>
+      }
+
+      <div class="room-actions">
+        <button class="action-btn btn-create" (click)="crearSala()" [disabled]="loading()">
+          @if (loading()) { <span class="mini-spin"></span> } @else { 🏠 }
+          Crear Sala
+        </button>
+
+        <div class="divider-or">o</div>
+
+        <div class="join-row">
+          <input
+            type="text"
+            [(ngModel)]="codigoInput"
+            placeholder="Código de sala (ej: AB12CD)"
+            class="code-input"
+            maxlength="6"
+            (keyup.enter)="unirseASala()"
+          />
+          <button class="action-btn btn-join" (click)="unirseASala()" [disabled]="loading()">
+            @if (loading()) { <span class="mini-spin"></span> } @else { 🚪 }
+            Unirse
+          </button>
+        </div>
+      </div>
+
+    } @else if (vista() === 'esperando') {
+      <!-- ── ESPERANDO OPONENTE ── -->
+      <div class="waiting-box">
+        <div class="search-spinner"></div>
+        <p class="waiting-title">Esperando oponente...</p>
+        <p class="waiting-sub">Comparte este código:</p>
+        <div class="room-code">{{ room()?.code }}</div>
+        <p class="waiting-hint">El otro jugador debe ingresar este código</p>
+        <button class="action-btn btn-cancel" (click)="cancelar()">✖ Cancelar</button>
+      </div>
+    }
+
+    <button class="back-btn" (click)="goHome()">← Volver al Menú</button>
+  </div>
+</div>

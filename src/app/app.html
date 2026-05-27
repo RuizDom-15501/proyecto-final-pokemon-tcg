@@ -1,0 +1,10 @@
+<!-- Splash screen — se muestra solo la primera vez, luego desaparece con fade -->
+@if (showSplash()) {
+  <app-splash (done)="onSplashDone()"></app-splash>
+}
+
+<!-- App principal — siempre en el DOM, la splash la cubre con z-index:9999 -->
+<app-navbar></app-navbar>
+<main class="app-main">
+  <router-outlet></router-outlet>
+</main>

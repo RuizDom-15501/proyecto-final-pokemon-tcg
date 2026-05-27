@@ -1,0 +1,219 @@
+.online-wrapper {
+  min-height: 100vh;
+  display: flex; align-items: center; justify-content: center;
+  background: linear-gradient(180deg, #050a14 0%, #0a0f1e 100%);
+  position: relative; overflow: hidden;
+}
+
+.online-orb {
+  position: absolute; width: 500px; height: 500px; border-radius: 50%;
+  background: radial-gradient(circle, rgba(59,76,202,0.12) 0%, transparent 70%);
+  top: 50%; left: 50%; transform: translate(-50%,-50%);
+  animation: orbPulse 6s ease-in-out infinite;
+}
+
+@keyframes orbPulse { 0%,100%{transform:translate(-50%,-50%) scale(1);} 50%{transform:translate(-50%,-50%) scale(1.2);} }
+
+.online-content {
+  position: relative; z-index: 2;
+  display: flex; flex-direction: column; align-items: center; gap: 20px;
+  padding: 40px 28px; max-width: 520px; width: 90%;
+  background: rgba(10,15,30,0.9);
+  border: 1px solid rgba(59,76,202,0.3);
+  border-radius: 20px;
+  box-shadow: 0 20px 60px rgba(0,0,0,0.6);
+}
+
+.online-icon { font-size: 3rem; filter: drop-shadow(0 0 20px rgba(59,76,202,0.6)); }
+
+.online-title {
+  font-family: 'Cinzel', serif; font-size: 2rem; font-weight: 700;
+  color: #a8b2d8; letter-spacing: 4px;
+}
+
+.online-sub { font-size: 0.85rem; color: #7a8aaa; letter-spacing: 1px; }
+.online-sub strong { color: #c9a227; }
+
+/* ── Botones de acción ── */
+.action-btn {
+  padding: 12px 32px; border: none; border-radius: 10px;
+  font-size: 1rem; font-weight: 700; letter-spacing: 1px;
+  cursor: pointer; transition: transform 0.15s, box-shadow 0.15s;
+}
+
+.btn-find {
+  background: linear-gradient(135deg, #c9a227, #f9ca24);
+  color: #050a14;
+  box-shadow: 0 4px 16px rgba(201,162,39,0.3);
+}
+
+.btn-find:hover { transform: translateY(-2px); box-shadow: 0 8px 24px rgba(201,162,39,0.5); }
+
+.btn-login {
+  background: linear-gradient(135deg, #3b4cca, #5c6bc0);
+  color: #fff;
+}
+
+.btn-cancel {
+  background: rgba(255,71,87,0.15); color: #ff4757;
+  border: 1px solid rgba(255,71,87,0.3);
+  padding: 8px 20px; font-size: 0.85rem;
+}
+
+/* ── Buscando ── */
+.searching-box {
+  display: flex; flex-direction: column; align-items: center; gap: 12px;
+  background: rgba(201,162,39,0.06); border: 1px solid rgba(201,162,39,0.2);
+  border-radius: 12px; padding: 20px 32px;
+  color: #c9a227;
+}
+
+.search-spinner {
+  width: 40px; height: 40px;
+  border: 3px solid rgba(201,162,39,0.2);
+  border-top-color: #c9a227;
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* ── Encontrado ── */
+.found-box {
+  display: flex; flex-direction: column; align-items: center; gap: 8px;
+  background: rgba(46,213,115,0.06); border: 1px solid rgba(46,213,115,0.3);
+  border-radius: 12px; padding: 20px 32px;
+  color: #2ed573; text-align: center;
+}
+
+.found-icon { font-size: 2rem; }
+.found-sub  { font-size: 0.75rem; color: #7a8aaa; }
+.found-note { font-size: 0.75rem; color: #3a4a6a; font-style: italic; }
+
+/* ── Features ── */
+.feature-list { display: flex; flex-direction: column; gap: 10px; width: 100%; }
+
+.feature-item {
+  display: flex; align-items: flex-start; gap: 14px;
+  background: rgba(255,255,255,0.03); border-radius: 10px;
+  padding: 10px 14px; border: 1px solid rgba(255,255,255,0.06);
+}
+
+.feature-icon { font-size: 1.3rem; flex-shrink: 0; margin-top: 2px; }
+.feature-item strong { display: block; color: #e8d5a3; font-size: 0.9rem; margin-bottom: 2px; }
+.feature-item p { color: #7a8aaa; font-size: 0.78rem; margin: 0; }
+
+/* ── Ranking ── */
+.ranking-box {
+  width: 100%;
+  background: rgba(255,255,255,0.03);
+  border: 1px solid rgba(201,162,39,0.15);
+  border-radius: 12px;
+  padding: 14px 16px;
+}
+
+.ranking-title {
+  font-size: 0.85rem; color: #c9a227; letter-spacing: 2px;
+  text-transform: uppercase; margin-bottom: 10px;
+}
+
+.ranking-row {
+  display: flex; align-items: center; gap: 10px;
+  padding: 6px 0; border-bottom: 1px solid rgba(255,255,255,0.04);
+  font-size: 0.82rem;
+}
+
+.ranking-row:last-child { border-bottom: none; }
+
+.rank-pos  { color: #c9a227; font-weight: 700; min-width: 28px; }
+.rank-name { flex: 1; color: #e8d5a3; }
+.rank-wins { color: #2ed573; min-width: 32px; }
+.rank-wr   { color: #7a8aaa; min-width: 40px; text-align: right; }
+
+/* ── Botón volver ── */
+.back-btn {
+  background: rgba(255,255,255,0.06); color: #a8b2d8;
+  border: 1px solid rgba(255,255,255,0.1);
+  padding: 10px 28px; border-radius: 8px;
+  font-family: 'Rajdhani', sans-serif; font-size: 1rem;
+  cursor: pointer; letter-spacing: 1px;
+  transition: background 0.2s, transform 0.15s;
+}
+
+.back-btn:hover { background: rgba(255,255,255,0.1); transform: translateY(-2px); }
+
+/* ── Sala online ── */
+.online-error {
+  background: rgba(255,71,87,0.1); border: 1px solid rgba(255,71,87,0.3);
+  border-radius: 8px; padding: 10px 14px; color: #ff4757;
+  font-size: 0.85rem; text-align: center; width: 100%;
+}
+
+.room-actions {
+  display: flex; flex-direction: column; align-items: center; gap: 12px; width: 100%;
+}
+
+.btn-create {
+  background: linear-gradient(135deg, #c9a227, #f9ca24); color: #050a14;
+  box-shadow: 0 4px 16px rgba(201,162,39,0.3); width: 100%;
+  display: flex; align-items: center; justify-content: center; gap: 8px;
+}
+
+.btn-create:hover:not(:disabled) { transform: translateY(-2px); box-shadow: 0 8px 24px rgba(201,162,39,0.5); }
+.btn-create:disabled { opacity: 0.6; cursor: not-allowed; }
+
+.divider-or {
+  font-size: 0.8rem; color: #3a4a6a; letter-spacing: 2px; text-transform: uppercase;
+}
+
+.join-row { display: flex; gap: 8px; width: 100%; }
+
+.code-input {
+  flex: 1; background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.12);
+  border-radius: 8px; padding: 11px 14px; color: #e8d5a3; font-size: 1rem;
+  letter-spacing: 3px; text-transform: uppercase; outline: none;
+  transition: border-color 0.2s;
+}
+
+.code-input:focus { border-color: rgba(201,162,39,0.5); }
+.code-input::placeholder { color: #3a4a6a; letter-spacing: 1px; text-transform: none; font-size: 0.82rem; }
+
+.btn-join {
+  background: rgba(59,76,202,0.2); color: #a8b2d8;
+  border: 1px solid rgba(59,76,202,0.4);
+  display: flex; align-items: center; gap: 6px; white-space: nowrap;
+}
+
+.btn-join:hover:not(:disabled) { background: rgba(59,76,202,0.35); transform: translateY(-2px); }
+.btn-join:disabled { opacity: 0.6; cursor: not-allowed; }
+
+/* ── Esperando ── */
+.waiting-box {
+  display: flex; flex-direction: column; align-items: center; gap: 12px;
+  background: rgba(201,162,39,0.05); border: 1px solid rgba(201,162,39,0.2);
+  border-radius: 14px; padding: 24px 32px; width: 100%; text-align: center;
+}
+
+.waiting-title { font-size: 1rem; color: #c9a227; font-weight: 700; letter-spacing: 1px; }
+.waiting-sub   { font-size: 0.82rem; color: #7a8aaa; }
+.waiting-hint  { font-size: 0.75rem; color: #3a4a6a; font-style: italic; }
+
+.room-code {
+  font-family: 'Cinzel', monospace; font-size: 2.2rem; font-weight: 900;
+  color: #f9ca24; letter-spacing: 8px;
+  text-shadow: 0 0 20px rgba(249,202,36,0.6);
+  background: rgba(201,162,39,0.08); border: 1px solid rgba(201,162,39,0.3);
+  border-radius: 10px; padding: 10px 24px;
+  animation: codePulse 2s ease-in-out infinite;
+}
+
+@keyframes codePulse {
+  0%,100% { box-shadow: 0 0 10px rgba(201,162,39,0.2); }
+  50%     { box-shadow: 0 0 24px rgba(201,162,39,0.5); }
+}
+
+.mini-spin {
+  display: inline-block; width: 14px; height: 14px;
+  border: 2px solid rgba(5,10,20,0.3); border-top-color: #050a14;
+  border-radius: 50%; animation: spin 0.7s linear infinite;
+}

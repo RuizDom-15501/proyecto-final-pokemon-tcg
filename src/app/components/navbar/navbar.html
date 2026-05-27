@@ -1,0 +1,48 @@
+<nav class="navbar">
+
+  <!-- Brand -->
+  <a class="nav-brand" routerLink="/">
+    <div class="nav-pokeball">
+      <div class="npb-top"></div>
+      <div class="npb-bottom"></div>
+      <div class="npb-band"></div>
+    </div>
+    <span>Pokémon TCG</span>
+  </a>
+
+  <!-- Links -->
+  <div class="nav-links">
+    <a routerLink="/"       routerLinkActive="active" [routerLinkActiveOptions]="{exact:true}">🏠 Inicio</a>
+    <a routerLink="/game"   routerLinkActive="active">⚔️ Jugar</a>
+    <a routerLink="/deck"   routerLinkActive="active">🃏 Mazos</a>
+    <a routerLink="/online" routerLinkActive="active">🌐 Online</a>
+  </div>
+
+  <!-- Auth -->
+  <div class="nav-auth">
+    @if (authService.isAuthenticated()) {
+
+      <!-- Avatar Google o emoji por defecto -->
+      <div class="nav-user-info">
+        @if (authService.getAvatarUrl()) {
+          <img
+            class="nav-avatar"
+            [src]="authService.getAvatarUrl()!"
+            [alt]="authService.getUsername()"
+            referrerpolicy="no-referrer"
+          />
+        } @else {
+          <span class="nav-avatar-emoji">🎮</span>
+        }
+        <span class="nav-user">{{ authService.getUsername() }}</span>
+      </div>
+
+      <button class="nav-btn nav-logout" (click)="logout()">Salir</button>
+
+    } @else {
+      <a routerLink="/login"    class="nav-btn nav-login">Entrar</a>
+      <a routerLink="/register" class="nav-btn nav-register">Registro</a>
+    }
+  </div>
+
+</nav>

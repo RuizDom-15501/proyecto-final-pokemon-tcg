@@ -1,0 +1,412 @@
+<div class="game-wrapper">
+
+  <!-- ══ TABLERO ══ -->
+  @if (!gameOver) {
+    <div class="board">
+
+      <!-- HUD CPU -->
+      <div class="hud hud-cpu" [class.shake]="shakeCpu" [class.exposed]="cpuExposed">
+        <div class="hud-avatar">
+          @if (cpuActive) {
+            <img [src]="cpuActive.imagen" [alt]="cpuActive.nombre" />
+          } @else {
+            <div class="hud-empty-avatar">💀</div>
+          }
+        </div>
+        <div class="hud-info">
+          <div class="hud-name">
+            <span class="hud-label">CPU</span>
+            <span class="hud-pokemon-name">{{ cpuActive?.nombre ?? 'Sin Pokémon' }}</span>
+            @if (cpuActive) {
+              <span class="type-chip" [style.background]="getTypeColor(cpuActive.tipo)">{{ cpuActive.tipo }}</span>
+            }
+            @if (cpuExposed) {
+              <span class="exposed-badge">⚠️ EXPUESTA</span>
+            }
+          </div>
+          <div class="hp-bar-wrap">
+            <div class="hp-bar">
+              <div class="hp-fill"
+                [style.width.%]="cpuActiveHpPercent"
+                [style.background]="getHpColor(cpuActiveHpPercent)">
+              </div>
+            </div>
+            <span class="hp-text">{{ cpuActive?.vidaActual ?? 0 }} / {{ cpuActive?.hp ?? 0 }}</span>
+          </div>
+          <div class="global-hp-bar-wrap">
+            <span class="global-label">Vida Global</span>
+            <div class="global-hp-bar">
+              <div class="global-hp-fill" [style.width.%]="cpuHpPercent" style="background:#ff4757"></div>
+            </div>
+            <span class="global-hp-text">{{ cpuLife }}</span>
+          </div>
+        </div>
+        <div class="hud-bench-count">
+          <span class="bench-count-label">Reserva</span>
+          <span class="bench-count-value">{{ cpuBench.length }}</span>
+        </div>
+      </div>
+
+      <!-- Banner de turno -->
+      <div class="turn-banner" [class.player-turn]="turno === 'jugador'" [class.cpu-turn]="turno === 'cpu'">
+        <div class="turn-inner">
+          <span class="turn-icon">{{ turno === 'jugador' ? '⚔️' : '🤖' }}</span>
+          <span class="turn-text">{{ turno === 'jugador' ? 'TU TURNO' : 'CPU ATACANDO...' }}</span>
+          <span class="turn-round">Ronda {{ roundNumber }}</span>
+        </div>
+        @if (cpuThinking) {
+          <div class="cpu-thinking">
+            <span class="dot"></span><span class="dot"></span><span class="dot"></span>
+          </div>
+        }
+      </div>
+
+      <!-- Badge Online -->
+      <!-- Zona de batalla -->
+      <div class="battle-zone">
+
+        <!-- Animación de ataque — position:absolute, NO rompe el grid -->
+        @if (attackAnim) {
+          <div class="attack-anim-overlay"
+               [class.anim-to-cpu]="attackAnimTarget === 'cpu'"
+               [class.anim-to-player]="attackAnimTarget === 'player'">
+            <div class="attack-particle"
+                 [class.fire-anim]="attackAnimType === 'FIRE'"
+                 [class.water-anim]="attackAnimType === 'WATER'"
+                 [class.grass-anim]="attackAnimType === 'GRASS'"
+                 [class.electric-anim]="attackAnimType === 'ELECTRIC'"
+                 [class.ice-anim]="attackAnimType === 'ICE'"
+                 [class.psychic-anim]="attackAnimType === 'PSYCHIC'"
+                 [class.dark-anim]="attackAnimType === 'DARK'"
+                 [class.ghost-anim]="attackAnimType === 'GHOST'"
+                 [class.dragon-anim]="attackAnimType === 'DRAGON'"
+                 [class.fairy-anim]="attackAnimType === 'FAIRY'"
+                 [class.normal-anim]="!['FIRE','WATER','GRASS','ELECTRIC','ICE','PSYCHIC','DARK','GHOST','DRAGON','FAIRY'].includes(attackAnimType)">
+              {{ getAttackEmoji(attackAnimType) }}
+            </div>
+          </div>
+        }
+
+        <!-- Campo CPU -->
+        <div class="field-side cpu-side">
+          <div class="field-label">Campo Enemigo</div>
+          <div class="active-slot" [class.empty]="!cpuActive" [class.exposed-slot]="cpuExposed">
+            @if (cpuActive) {
+              <div class="battle-card cpu-card" [class.paralyzed]="estaBloqueada(cpuActive)" [class.shake]="shakeCpu">
+                <div class="card-glow cpu-glow"></div>
+                <div class="status-row">
+                  @for (eff of cpuActive.efectosActivos; track eff.id) {
+                    <span class="status-badge" [class.debuff]="eff.tipo === 'debuff'" [class.buff]="eff.tipo === 'buff'">{{ eff.nombre }}</span>
+                  }
+                </div>
+                <div class="card-img-wrap">
+                  <img [src]="cpuActive.imagen" [alt]="cpuActive.nombre" />
+                </div>
+                <div class="card-footer">
+                  <span class="card-name">{{ cpuActive.nombre }}</span>
+                  <div class="card-hp-bar">
+                    <div class="card-hp-fill"
+                      [style.width.%]="cpuActiveHpPercent"
+                      [style.background]="getHpColor(cpuActiveHpPercent)">
+                    </div>
+                  </div>
+                  <div class="card-stats">
+                    <span>⚔️ {{ calcularAtaqueFinal(cpuActive) }}</span>
+                    <span>🛡️ {{ calcularDefensaFinal(cpuActive) }}</span>
+                  </div>
+                </div>
+              </div>
+            } @else if (cpuExposed) {
+              <div class="exposed-slot-msg">
+                <div class="exposed-icon">🎯</div>
+                <span>¡CPU sin Pokémon!</span>
+                <small>Los ataques dañan su vida global</small>
+              </div>
+            } @else {
+              <div class="empty-slot-msg">
+                <span class="slot-spinner"></span>
+                Cambiando Pokémon...
+              </div>
+            }
+          </div>
+          <!-- Reserva CPU -->
+          <div class="bench-row">
+            @for (b of cpuBench; track b.id) {
+              <div class="bench-card cpu-bench">
+                <img [src]="b.imagen" [alt]="b.nombre" />
+                <span>{{ b.nombre }}</span>
+                <div class="bench-hp-bar">
+                  <div [style.width.%]="getHpPercent(b.vidaActual, b.hp)"
+                       [style.background]="getHpColor(getHpPercent(b.vidaActual, b.hp))">
+                  </div>
+                </div>
+              </div>
+            }
+            @if (cpuBench.length === 0) {
+              <div class="bench-empty" [class.bench-ko]="cpuExposed">
+                {{ cpuExposed ? '☠️ Sin reserva' : 'Sin reserva' }}
+              </div>
+            }
+          </div>
+        </div>
+
+        <!-- Divisor -->
+        <div class="battle-divider">
+          <div class="divider-line"></div>
+          <div class="divider-icon">⚔️</div>
+          <div class="divider-line"></div>
+        </div>
+
+        <!-- Campo Jugador -->
+        <div class="field-side player-side">
+          <div class="field-label">Tu Campo</div>
+          <div class="active-slot" [class.empty]="!playerActive" [class.exposed-slot]="playerExposed">
+            @if (playerActive) {
+              <div class="battle-card player-card"
+                   [class.paralyzed]="estaBloqueada(playerActive)"
+                   [class.shake]="shakePlayer"
+                   [class.can-act]="puedeActuarJugador()"
+                   (click)="seleccionarCarta(playerActive)">
+                <div class="card-glow player-glow"></div>
+                @if (puedeActuarJugador()) {
+                  <div class="card-clickable-hint">Toca para actuar</div>
+                }
+                <div class="status-row">
+                  @for (eff of playerActive.efectosActivos; track eff.id) {
+                    <span class="status-badge" [class.debuff]="eff.tipo === 'debuff'" [class.buff]="eff.tipo === 'buff'">{{ eff.nombre }}</span>
+                  }
+                </div>
+                <div class="card-img-wrap">
+                  <img [src]="playerActive.imagen" [alt]="playerActive.nombre" />
+                </div>
+                <div class="card-footer">
+                  <span class="card-name">{{ playerActive.nombre }}</span>
+                  <div class="card-hp-bar">
+                    <div class="card-hp-fill"
+                      [style.width.%]="playerActiveHpPercent"
+                      [style.background]="getHpColor(playerActiveHpPercent)">
+                    </div>
+                  </div>
+                  <div class="card-stats">
+                    <span>⚔️ {{ calcularAtaqueFinal(playerActive) }}</span>
+                    <span>🛡️ {{ calcularDefensaFinal(playerActive) }}</span>
+                  </div>
+                </div>
+              </div>
+            } @else if (playerExposed) {
+              <div class="exposed-slot-msg player-exposed">
+                <div class="exposed-icon">💔</div>
+                <span>¡Sin Pokémon!</span>
+                <small>Los ataques dañan tu vida global</small>
+              </div>
+            } @else {
+              <div class="empty-slot-msg">
+                <span class="slot-spinner"></span>
+                Cambiando Pokémon...
+              </div>
+            }
+          </div>
+          <!-- Reserva Jugador -->
+          <div class="bench-row">
+            @for (b of playerBench; track b.id) {
+              <div class="bench-card player-bench"
+                   (click)="cambiarActiva(b)"
+                   [class.bench-disabled]="!puedeActuarJugador()">
+                <img [src]="b.imagen" [alt]="b.nombre" />
+                <span>{{ b.nombre }}</span>
+                <div class="bench-hp-bar">
+                  <div [style.width.%]="getHpPercent(b.vidaActual, b.hp)"
+                       [style.background]="getHpColor(getHpPercent(b.vidaActual, b.hp))">
+                  </div>
+                </div>
+              </div>
+            }
+            @if (playerBench.length === 0) {
+              <div class="bench-empty" [class.bench-ko]="playerExposed">
+                {{ playerExposed ? '☠️ Sin reserva' : 'Sin reserva' }}
+              </div>
+            }
+          </div>
+        </div>
+      </div>
+
+      <!-- HUD Jugador -->
+      <div class="hud hud-player" [class.shake]="shakePlayer" [class.exposed]="playerExposed">
+        <div class="hud-avatar">
+          @if (playerActive) {
+            <img [src]="playerActive.imagen" [alt]="playerActive.nombre" />
+          } @else {
+            <div class="hud-empty-avatar">💀</div>
+          }
+        </div>
+        <div class="hud-info">
+          <div class="hud-name">
+            <span class="hud-label">TÚ</span>
+            <span class="hud-pokemon-name">{{ playerActive?.nombre ?? 'Sin Pokémon' }}</span>
+            @if (playerActive) {
+              <span class="type-chip" [style.background]="getTypeColor(playerActive.tipo)">{{ playerActive.tipo }}</span>
+            }
+            @if (playerExposed) {
+              <span class="exposed-badge exposed-player">⚠️ EXPUESTO</span>
+            }
+          </div>
+          <div class="hp-bar-wrap">
+            <div class="hp-bar">
+              <div class="hp-fill"
+                [style.width.%]="playerActiveHpPercent"
+                [style.background]="getHpColor(playerActiveHpPercent)">
+              </div>
+            </div>
+            <span class="hp-text">{{ playerActive?.vidaActual ?? 0 }} / {{ playerActive?.hp ?? 0 }}</span>
+          </div>
+          <div class="global-hp-bar-wrap">
+            <span class="global-label">Vida Global</span>
+            <div class="global-hp-bar">
+              <div class="global-hp-fill" [style.width.%]="playerHpPercent" style="background:#2ed573"></div>
+            </div>
+            <span class="global-hp-text">{{ playerLife }}</span>
+          </div>
+        </div>
+        <div class="hud-bench-count">
+          <span class="bench-count-label">Reserva</span>
+          <span class="bench-count-value">{{ playerBench.length }}</span>
+        </div>
+        <!-- Indicador de acción -->
+        <div class="action-indicator" [class.active]="puedeActuarJugador()">
+          @if (puedeActuarJugador()) {
+            <span class="action-dot"></span>
+            <span class="action-text">TU TURNO</span>
+          } @else {
+            <span class="action-text waiting">Esperando...</span>
+          }
+        </div>
+      </div>
+
+      <!-- Log -->
+      <div class="battle-log">
+        <div class="log-header">📜 Registro de Batalla</div>
+        <div class="log-entries">
+          @for (log of historialLog; track $index) {
+            <div class="log-entry" [class.log-new]="$index === 0">{{ log }}</div>
+          }
+        </div>
+      </div>
+
+    </div>
+  }
+
+  <!-- ══ MODAL DE ACCIONES ══ -->
+  @if (mostrarMenuAcciones && cartaSeleccionada) {
+    <div class="modal-overlay" (click)="cerrarAcciones()">
+      <div class="action-modal" (click)="$event.stopPropagation()">
+        <div class="modal-card-preview">
+          <img [src]="cartaSeleccionada.imagen" [alt]="cartaSeleccionada.nombre" />
+          <div class="modal-card-info">
+            <h3>{{ cartaSeleccionada.nombre }}</h3>
+            <span class="type-chip" [style.background]="getTypeColor(cartaSeleccionada.tipo)">{{ cartaSeleccionada.tipo }}</span>
+            <div class="modal-stats">
+              <span>⚔️ {{ calcularAtaqueFinal(cartaSeleccionada) }}</span>
+              <span>🛡️ {{ calcularDefensaFinal(cartaSeleccionada) }}</span>
+              <span>❤️ {{ cartaSeleccionada.vidaActual }} / {{ cartaSeleccionada.hp }}</span>
+            </div>
+          </div>
+        </div>
+        <!-- Objetivo actual -->
+        <div class="target-info" [class.target-direct]="!cpuActive">
+          <span class="target-label">🎯 Objetivo:</span>
+          <span class="target-name">{{ cpuActive ? cpuActive.nombre : 'Vida Global CPU' }}</span>
+          <span class="target-hp">{{ cpuActive ? (cpuActive.vidaActual + ' HP') : (cpuLife + ' HP') }}</span>
+        </div>
+        <div class="ability-box">
+          <div class="ability-name">✨ {{ cartaSeleccionada.habilidad.nombre }}</div>
+          <div class="ability-desc">{{ cartaSeleccionada.habilidad.descripcion }}</div>
+        </div>
+        <div class="modal-actions">
+          <button class="action-btn btn-attack" (click)="ejecutarAtaque()">
+            <span class="action-btn-icon">💥</span>
+            <span class="action-btn-text">
+              <strong>Atacar</strong>
+              <small>Ataque básico</small>
+            </span>
+          </button>
+          <button class="action-btn btn-ability" (click)="ejecutarHabilidad()">
+            <span class="action-btn-icon">✨</span>
+            <span class="action-btn-text">
+              <strong>Habilidad</strong>
+              <small>{{ cartaSeleccionada.habilidad.nombre }}</small>
+            </span>
+          </button>
+          <button class="action-btn btn-cancel" (click)="cerrarAcciones()">
+            <span class="action-btn-icon">✖</span>
+            <span class="action-btn-text"><strong>Cancelar</strong></span>
+          </button>
+        </div>
+      </div>
+    </div>
+  }
+
+  <!-- ══ FIN DE JUEGO ══ -->
+  @if (gameOver) {
+    <div class="endgame-overlay">
+      <div class="endgame-particles">
+        @for (i of [1,2,3,4,5,6,7,8]; track i) {
+          <span class="end-particle" [class.gold-particle]="resultado === 'victoria'"></span>
+        }
+      </div>
+      <div class="endgame-box"
+           [class.victory-box]="resultado === 'victoria'"
+           [class.defeat-box]="resultado === 'derrota'"
+           [class.draw-box]="resultado === 'empate'">
+        <div class="endgame-icon">
+          @if (resultado === 'victoria') { <span>🏆</span> }
+          @if (resultado === 'derrota')  { <span>💀</span> }
+          @if (resultado === 'empate')   { <span>🤝</span> }
+        </div>
+        <h1 class="endgame-title">
+          @if (resultado === 'victoria') { <span>¡VICTORIA!</span> }
+          @if (resultado === 'derrota')  { <span>DERROTA</span> }
+          @if (resultado === 'empate')   { <span>EMPATE</span> }
+        </h1>
+        <p class="endgame-msg">{{ mensaje }}</p>
+        <div class="endgame-stats">
+          <div class="stat-item">
+            <span class="stat-label">Tu Vida</span>
+            <span class="stat-value" [style.color]="getHpColor(playerHpPercent)">{{ playerLife }}</span>
+          </div>
+          <div class="stat-divider">vs</div>
+          <div class="stat-item">
+            <span class="stat-label">CPU Vida</span>
+            <span class="stat-value" [style.color]="getHpColor(cpuHpPercent)">{{ cpuLife }}</span>
+          </div>
+        </div>
+        <div class="endgame-buttons">
+          <button class="end-btn btn-restart" (click)="reiniciarJuego()">🔄 Jugar de Nuevo</button>
+          <button class="end-btn btn-menu" (click)="volverAlMenu()">🏠 Menú Principal</button>
+        </div>
+      </div>
+    </div>
+  }
+
+  <!-- ══ NOTIFICACIÓN KO ══ -->
+  @if (showKo) {
+    <div class="ko-notification"><div class="ko-inner">{{ koMessage }}</div></div>
+  }
+
+  <!-- ══ GOLPE DIRECTO ══ -->
+  @if (showDirectHit) {
+    <div class="direct-hit-notification"><div class="direct-hit-inner">{{ directHitMessage }}</div></div>
+  }
+
+  <!-- ══ POPUP DAÑO ══ -->
+  @if (showDamage) {
+    <div class="damage-popup" [class.damage-player]="damageTarget === 'player'">-{{ lastDamage }}</div>
+  }
+
+  <!-- ══ BADGE ONLINE ══ -->
+  @if (isOnline && roomCode) {
+    <div class="online-badge">
+      🌐 ONLINE · Sala {{ roomCode }}
+    </div>
+  }
+
+</div>

@@ -1,0 +1,152 @@
+<div class="deck-wrapper">
+  <div class="deck-bg"></div>
+
+  <div class="deck-layout">
+
+    <!-- ══ PANEL IZQUIERDO: Pokémon disponibles ══ -->
+    <div class="panel panel-left">
+      <div class="panel-header">
+        <h2>📦 Pokémon Disponibles</h2>
+        <span class="panel-count">{{ pokemonsDisponibles.length }} cartas</span>
+      </div>
+
+      @if (loadingPokemons()) {
+        <div class="loading-row">
+          <div class="mini-spinner"></div>
+          <span>Cargando Pokémon...</span>
+        </div>
+      }
+
+      <div class="pokemon-grid">
+        @for (p of pokemonsDisponibles; track p.id) {
+          <div class="poke-card" (click)="agregarAlMazo(p)" title="Agregar al mazo">
+            <div class="poke-type-bar" [style.background]="getTypeColor(p.tipo)"></div>
+            <img [src]="p.imagen" [alt]="p.nombre" />
+            <div class="poke-info">
+              <span class="poke-name">{{ p.nombre }}</span>
+              <span class="poke-type" [style.background]="getTypeColor(p.tipo)">{{ p.tipo }}</span>
+            </div>
+            <div class="poke-stats">
+              <span>❤️ {{ p.hp }}</span>
+              <span>⚔️ {{ p.ataque }}</span>
+            </div>
+            <div class="poke-add-hint">+ Agregar</div>
+          </div>
+        }
+      </div>
+    </div>
+
+    <!-- ══ PANEL CENTRAL: Editor de mazo ══ -->
+    <div class="panel panel-center">
+      <div class="panel-header">
+        <h2>🃏 Editor de Mazo</h2>
+        <span class="panel-count">{{ deckActual.length }} / 6</span>
+      </div>
+
+      <!-- Nombre del mazo -->
+      <div class="deck-name-row">
+        <input
+          type="text"
+          [(ngModel)]="deckNombre"
+          placeholder="Nombre del mazo"
+          class="deck-name-input"
+          maxlength="30"
+        />
+      </div>
+
+      <!-- Mensaje de feedback -->
+      @if (mensaje()) {
+        <div class="deck-msg" [class.msg-ok]="tipoMensaje === 'ok'" [class.msg-error]="tipoMensaje === 'error'">
+          {{ mensaje() }}
+        </div>
+      }
+
+      <!-- Cartas del mazo actual -->
+      @if (deckActual.length === 0) {
+        <div class="deck-empty">
+          <span>🃏</span>
+          <p>Haz clic en un Pokémon para agregarlo</p>
+        </div>
+      } @else {
+        <div class="deck-cards-list">
+          @for (p of deckActual; track p.id) {
+            <div class="deck-entry">
+              <img [src]="p.imagen" [alt]="p.nombre" />
+              <div class="deck-entry-info">
+                <span class="deck-entry-name">{{ p.nombre }}</span>
+                <span class="deck-entry-type" [style.background]="getTypeColor(p.tipo)">{{ p.tipo }}</span>
+              </div>
+              <div class="deck-entry-stats">
+                <span>❤️ {{ p.hp }}</span>
+                <span>⚔️ {{ p.ataque }}</span>
+                <span>🛡️ {{ p.defensa }}</span>
+              </div>
+              <button class="remove-btn" (click)="quitarDelMazo(p)" title="Quitar">✖</button>
+            </div>
+          }
+        </div>
+      }
+
+      <!-- Acciones -->
+      <div class="deck-actions">
+        <button class="deck-btn btn-save" (click)="guardarMazo()" [disabled]="guardando()">
+          @if (guardando()) {
+            <span class="mini-spinner"></span> Guardando...
+          } @else {
+            💾 Guardar Mazo
+          }
+        </button>
+        <button class="deck-btn btn-clear" (click)="limpiarMazo()">🗑️ Limpiar</button>
+        <button class="deck-btn btn-back" (click)="volverAlMenu()">← Menú</button>
+      </div>
+    </div>
+
+    <!-- ══ PANEL DERECHO: Mazos guardados ══ -->
+    <div class="panel panel-right">
+      <div class="panel-header">
+        <h2>📚 Mis Mazos</h2>
+        @if (authService.isAuthenticated()) {
+          <button class="refresh-btn" (click)="cargarMazos()" title="Actualizar">🔄</button>
+        }
+      </div>
+
+      @if (!authService.isAuthenticated()) {
+        <div class="auth-hint">
+          <span>🔐</span>
+          <p>Inicia sesión para guardar y cargar mazos</p>
+        </div>
+      } @else if (loadingMazos()) {
+        <div class="loading-row">
+          <div class="mini-spinner"></div>
+          <span>Cargando mazos...</span>
+        </div>
+      } @else if (mazosGuardados().length === 0) {
+        <div class="deck-empty">
+          <span>📭</span>
+          <p>No tienes mazos guardados</p>
+        </div>
+      } @else {
+        <div class="saved-decks-list">
+          @for (mazo of mazosGuardados(); track mazo.id) {
+            <div class="saved-deck-card">
+              <div class="saved-deck-header">
+                <span class="saved-deck-name">{{ mazo.nombre }}</span>
+                <span class="saved-deck-count">{{ mazo.cards.length }} cartas</span>
+              </div>
+              <div class="saved-deck-types">
+                @for (c of mazo.cards; track c.id) {
+                  <span class="mini-type" [style.background]="getTypeColor(c.tipo)">{{ c.tipo }}</span>
+                }
+              </div>
+              <div class="saved-deck-actions">
+                <button class="sd-btn sd-load" (click)="cargarMazoEnEditor(mazo)">✏️ Editar</button>
+                <button class="sd-btn sd-delete" (click)="eliminarMazo(mazo)">🗑️</button>
+              </div>
+            </div>
+          }
+        </div>
+      }
+    </div>
+
+  </div>
+</div>

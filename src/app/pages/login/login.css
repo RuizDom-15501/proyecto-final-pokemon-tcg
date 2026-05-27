@@ -1,0 +1,270 @@
+.auth-wrapper {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: linear-gradient(180deg, #050a14 0%, #080d1a 100%);
+  position: relative;
+  overflow: hidden;
+}
+
+.auth-bg { position: absolute; inset: 0; pointer-events: none; }
+
+.auth-orb {
+  position: absolute;
+  border-radius: 50%;
+  filter: blur(80px);
+  opacity: 0.15;
+}
+
+.orb-1 {
+  width: 500px; height: 500px;
+  background: radial-gradient(circle, #c9a227, transparent);
+  top: -100px; left: -100px;
+  animation: orbFloat 8s ease-in-out infinite;
+}
+
+.orb-2 {
+  width: 400px; height: 400px;
+  background: radial-gradient(circle, #2ed573, transparent);
+  bottom: -80px; right: -80px;
+  animation: orbFloat 10s ease-in-out infinite reverse;
+}
+
+@keyframes orbFloat {
+  0%,100% { transform: translate(0,0); }
+  50%     { transform: translate(30px, 20px); }
+}
+
+/* ── Card ── */
+.auth-card {
+  position: relative; z-index: 2;
+  background: rgba(10,15,30,0.95);
+  border: 1px solid rgba(201,162,39,0.3);
+  border-radius: 20px;
+  padding: 36px 32px;
+  width: 100%; max-width: 400px;
+  box-shadow: 0 20px 60px rgba(0,0,0,0.7), 0 0 40px rgba(201,162,39,0.05);
+  animation: cardIn 0.4s ease;
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+}
+
+@keyframes cardIn {
+  from { opacity: 0; transform: translateY(20px) scale(0.97); }
+  to   { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+/* ── Logo ── */
+.auth-logo {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  margin-bottom: 20px;
+  justify-content: center;
+}
+
+.pokeball-mini {
+  width: 44px; height: 44px;
+  border-radius: 50%;
+  border: 3px solid #c9a227;
+  position: relative;
+  overflow: hidden;
+  box-shadow: 0 0 16px rgba(201,162,39,0.4);
+}
+
+.pb-top    { position: absolute; top:0; left:0; right:0; height:50%; background: linear-gradient(135deg,#e84118,#c0392b); }
+.pb-bottom { position: absolute; bottom:0; left:0; right:0; height:50%; background: #1e272e; }
+.pb-band {
+  position: absolute; top:50%; left:0; right:0; height:6px;
+  background: #c9a227; transform: translateY(-50%); z-index:2;
+  display:flex; align-items:center; justify-content:center;
+}
+.pb-btn { width:12px; height:12px; border-radius:50%; background:#c9a227; border:2px solid #050a14; }
+
+.auth-title {
+  font-family: 'Cinzel', serif;
+  font-size: 1.4rem;
+  color: #c9a227;
+  letter-spacing: 2px;
+}
+
+.auth-subtitle {
+  font-size: 1rem;
+  color: #a8b2d8;
+  text-align: center;
+  margin-bottom: 20px;
+  letter-spacing: 1px;
+}
+
+/* ── Error ── */
+.auth-error {
+  background: rgba(255,71,87,0.1);
+  border: 1px solid rgba(255,71,87,0.4);
+  border-radius: 8px;
+  padding: 10px 14px;
+  color: #ff4757;
+  font-size: 0.85rem;
+  margin-bottom: 16px;
+  text-align: center;
+}
+
+/* ══════════════════════════════════════════
+   BOTÓN GOOGLE
+══════════════════════════════════════════ */
+.google-btn {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  padding: 13px 20px;
+  background: #ffffff;
+  color: #3c4043;
+  border: 1px solid #dadce0;
+  border-radius: 10px;
+  font-size: 0.95rem;
+  font-weight: 600;
+  letter-spacing: 0.25px;
+  cursor: pointer;
+  transition: background 0.2s, box-shadow 0.2s, transform 0.15s;
+  margin-bottom: 16px;
+  font-family: 'Roboto', 'Segoe UI', sans-serif;
+}
+
+.google-btn:hover:not(:disabled) {
+  background: #f8f9fa;
+  box-shadow: 0 2px 12px rgba(0,0,0,0.25);
+  transform: translateY(-1px);
+}
+
+.google-btn:active:not(:disabled) {
+  background: #f1f3f4;
+  transform: translateY(0);
+  box-shadow: none;
+}
+
+.google-btn:disabled {
+  opacity: 0.65;
+  cursor: not-allowed;
+}
+
+.google-icon {
+  width: 20px;
+  height: 20px;
+  flex-shrink: 0;
+}
+
+/* ── Divisor ── */
+.auth-divider {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 16px;
+}
+
+.divider-line {
+  flex: 1;
+  height: 1px;
+  background: rgba(255,255,255,0.08);
+}
+
+.divider-text {
+  font-size: 0.75rem;
+  color: #3a4a6a;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+/* ── Formulario email ── */
+.auth-form { display: flex; flex-direction: column; gap: 14px; }
+
+.form-group { display: flex; flex-direction: column; gap: 6px; }
+
+.form-group label {
+  font-size: 0.78rem;
+  color: #7a8aaa;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+}
+
+.form-group input {
+  background: rgba(255,255,255,0.05);
+  border: 1px solid rgba(255,255,255,0.1);
+  border-radius: 8px;
+  padding: 11px 14px;
+  color: #e8d5a3;
+  font-size: 0.95rem;
+  outline: none;
+  transition: border-color 0.2s, box-shadow 0.2s;
+}
+
+.form-group input:focus {
+  border-color: rgba(201,162,39,0.6);
+  box-shadow: 0 0 0 3px rgba(201,162,39,0.1);
+}
+
+.form-group input::placeholder { color: #3a4a6a; }
+
+/* ── Botón email ── */
+.auth-btn {
+  margin-top: 4px;
+  padding: 13px;
+  background: linear-gradient(135deg, #c9a227, #f9ca24);
+  color: #050a14;
+  border: none;
+  border-radius: 10px;
+  font-size: 1rem;
+  font-weight: 700;
+  letter-spacing: 1px;
+  cursor: pointer;
+  transition: transform 0.15s, box-shadow 0.15s, opacity 0.2s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
+
+.auth-btn:hover:not(:disabled) {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 20px rgba(201,162,39,0.4);
+}
+
+.auth-btn:disabled { opacity: 0.6; cursor: not-allowed; }
+
+/* ── Spinners ── */
+.btn-spinner {
+  display: inline-block;
+  width: 16px; height: 16px;
+  border: 2px solid rgba(5,10,20,0.3);
+  border-top-color: #050a14;
+  border-radius: 50%;
+  animation: spin 0.7s linear infinite;
+  flex-shrink: 0;
+}
+
+.spinner-dark {
+  border-color: rgba(60,64,67,0.2);
+  border-top-color: #3c4043;
+}
+
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* ── Link registro ── */
+.auth-link {
+  text-align: center;
+  margin-top: 18px;
+  font-size: 0.85rem;
+  color: #7a8aaa;
+}
+
+.auth-link a {
+  color: #c9a227;
+  text-decoration: none;
+  font-weight: 700;
+  transition: color 0.2s;
+}
+
+.auth-link a:hover { color: #f9ca24; }

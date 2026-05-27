@@ -1,0 +1,432 @@
+/* ══════════════════════════════════════════
+   HOME — Pantalla principal estilo TCG
+══════════════════════════════════════════ */
+
+.home-wrapper {
+  position: relative;
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  background:
+    radial-gradient(ellipse at 20% 50%, rgba(30, 10, 60, 0.9) 0%, transparent 60%),
+    radial-gradient(ellipse at 80% 50%, rgba(10, 30, 60, 0.9) 0%, transparent 60%),
+    linear-gradient(180deg, #050a14 0%, #0a0f1e 40%, #0d1a2e 100%);
+}
+
+/* ── Partículas flotantes ── */
+.particles {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  overflow: hidden;
+}
+
+.particle {
+  position: absolute;
+  border-radius: 50%;
+  background: radial-gradient(circle, #c9a227 0%, transparent 70%);
+  opacity: 0;
+  animation: floatParticle 6s ease-in-out infinite;
+}
+
+@keyframes floatParticle {
+  0%   { opacity: 0; transform: translateY(0) scale(1); }
+  30%  { opacity: 0.6; }
+  70%  { opacity: 0.3; }
+  100% { opacity: 0; transform: translateY(-80px) scale(0.5); }
+}
+
+/* ── Orbes de fondo ── */
+.orb {
+  position: absolute;
+  border-radius: 50%;
+  filter: blur(80px);
+  pointer-events: none;
+}
+
+.orb-1 {
+  width: 500px; height: 500px;
+  background: rgba(201, 162, 39, 0.08);
+  top: -100px; left: -150px;
+  animation: orbPulse 8s ease-in-out infinite;
+}
+
+.orb-2 {
+  width: 400px; height: 400px;
+  background: rgba(59, 76, 202, 0.12);
+  bottom: -80px; right: -100px;
+  animation: orbPulse 10s ease-in-out infinite reverse;
+}
+
+.orb-3 {
+  width: 300px; height: 300px;
+  background: rgba(232, 65, 24, 0.08);
+  top: 50%; left: 50%;
+  transform: translate(-50%, -50%);
+  animation: orbPulse 12s ease-in-out infinite;
+}
+
+@keyframes orbPulse {
+  0%, 100% { transform: scale(1); opacity: 0.6; }
+  50%       { transform: scale(1.2); opacity: 1; }
+}
+
+/* ── Contenido central ── */
+.home-content {
+  position: relative;
+  z-index: 10;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 40px;
+  padding: 40px 20px;
+  width: 100%;
+  max-width: 900px;
+}
+
+/* ── Logo / Título ── */
+.logo-section {
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 16px;
+}
+
+/* Pokéball decorativa */
+.pokeball-icon {
+  width: 80px;
+  height: 80px;
+  border-radius: 50%;
+  border: 4px solid #c9a227;
+  position: relative;
+  overflow: hidden;
+  box-shadow: 0 0 30px rgba(201, 162, 39, 0.5), inset 0 0 20px rgba(0,0,0,0.5);
+  animation: rotateBall 8s linear infinite;
+}
+
+@keyframes rotateBall {
+  from { transform: rotate(0deg); }
+  to   { transform: rotate(360deg); }
+}
+
+.pokeball-top {
+  position: absolute;
+  top: 0; left: 0; right: 0;
+  height: 50%;
+  background: linear-gradient(135deg, #e84118, #c0392b);
+}
+
+.pokeball-bottom {
+  position: absolute;
+  bottom: 0; left: 0; right: 0;
+  height: 50%;
+  background: linear-gradient(135deg, #2f3542, #1e272e);
+}
+
+.pokeball-middle {
+  position: absolute;
+  top: 50%;
+  left: 0; right: 0;
+  height: 8px;
+  background: #c9a227;
+  transform: translateY(-50%);
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.pokeball-center {
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: #c9a227;
+  border: 3px solid #0a0f1e;
+  box-shadow: 0 0 10px rgba(201, 162, 39, 0.8);
+}
+
+/* Título */
+.game-title {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  line-height: 1;
+  gap: 4px;
+}
+
+.title-pokemon {
+  font-family: 'Cinzel', serif;
+  font-size: clamp(2.5rem, 6vw, 4.5rem);
+  font-weight: 900;
+  background: linear-gradient(135deg, #f9ca24, #c9a227, #f0932b);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  text-shadow: none;
+  letter-spacing: 4px;
+  filter: drop-shadow(0 0 20px rgba(201, 162, 39, 0.6));
+}
+
+.title-tactical {
+  font-family: 'Cinzel', serif;
+  font-size: clamp(1rem, 3vw, 1.8rem);
+  font-weight: 600;
+  color: #a8b2d8;
+  letter-spacing: 8px;
+  text-transform: uppercase;
+}
+
+.title-card {
+  font-family: 'Cinzel', serif;
+  font-size: clamp(1.2rem, 3.5vw, 2rem);
+  font-weight: 700;
+  color: #e8d5a3;
+  letter-spacing: 6px;
+  text-transform: uppercase;
+}
+
+.game-subtitle {
+  font-size: 0.95rem;
+  color: #7a8aaa;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+}
+
+/* ── Botones de menú ── */
+.menu-buttons {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  width: 100%;
+  max-width: 420px;
+}
+
+.menu-btn {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 18px 28px;
+  border: none;
+  border-radius: 12px;
+  cursor: pointer;
+  font-family: 'Rajdhani', sans-serif;
+  font-size: 1rem;
+  transition: transform 0.2s ease, box-shadow 0.2s ease, filter 0.2s ease;
+  position: relative;
+  overflow: hidden;
+  text-align: left;
+}
+
+.menu-btn::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(90deg, transparent, rgba(255,255,255,0.05), transparent);
+  transform: translateX(-100%);
+  transition: transform 0.4s ease;
+}
+
+.menu-btn:hover::before {
+  transform: translateX(100%);
+}
+
+.menu-btn:hover {
+  transform: translateY(-3px) scale(1.02);
+}
+
+.btn-solo {
+  background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%);
+  border: 2px solid #c9a227;
+  box-shadow: 0 4px 20px rgba(201, 162, 39, 0.25), inset 0 1px 0 rgba(201, 162, 39, 0.1);
+  color: #e8d5a3;
+}
+
+.btn-solo:hover {
+  box-shadow: 0 8px 30px rgba(201, 162, 39, 0.5), inset 0 1px 0 rgba(201, 162, 39, 0.2);
+  border-color: #f9ca24;
+}
+
+.btn-online {
+  background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #1a0a2e 100%);
+  border: 2px solid #4a4a7a;
+  box-shadow: 0 4px 20px rgba(100, 100, 200, 0.15);
+  color: #a8b2d8;
+}
+
+.btn-online:hover {
+  box-shadow: 0 8px 30px rgba(100, 100, 200, 0.3);
+  border-color: #7a7aaa;
+}
+
+.btn-icon {
+  font-size: 1.8rem;
+  flex-shrink: 0;
+}
+
+.btn-text {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+}
+
+.btn-text strong {
+  font-size: 1.2rem;
+  font-weight: 700;
+  letter-spacing: 1px;
+}
+
+.btn-text small {
+  font-size: 0.8rem;
+  opacity: 0.6;
+  margin-top: 2px;
+}
+
+.btn-arrow {
+  font-size: 1.8rem;
+  opacity: 0.5;
+  transition: opacity 0.2s, transform 0.2s;
+}
+
+.menu-btn:hover .btn-arrow {
+  opacity: 1;
+  transform: translateX(4px);
+}
+
+/* ── Pokémon decorativos ── */
+.deco-pokemon {
+  display: flex;
+  gap: 24px;
+  align-items: flex-end;
+  justify-content: center;
+  flex-wrap: wrap;
+}
+
+.deco-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  transition: transform 0.3s ease;
+}
+
+.deco-card:hover {
+  transform: translateY(-8px);
+}
+
+.deco-card img {
+  filter: drop-shadow(0 0 20px rgba(201, 162, 39, 0.4));
+  transition: filter 0.3s ease;
+}
+
+.deco-card:hover img {
+  filter: drop-shadow(0 0 30px rgba(201, 162, 39, 0.7));
+}
+
+.deco-left img, .deco-right img {
+  width: 120px;
+  height: 120px;
+  object-fit: contain;
+}
+
+.deco-center img {
+  width: 160px;
+  height: 160px;
+  object-fit: contain;
+}
+
+.deco-card span {
+  font-size: 0.75rem;
+  color: #7a8aaa;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+}
+
+/* ── Footer ── */
+.home-footer {
+  font-size: 0.75rem;
+  color: #3a4a6a;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+}
+
+/* ── Responsive ── */
+@media (max-width: 600px) {
+  .deco-left, .deco-right {
+    display: none;
+  }
+
+  .menu-buttons {
+    max-width: 100%;
+    padding: 0 16px;
+  }
+}
+
+/* ── Barra de usuario ── */
+.user-bar {
+  position: fixed;
+  top: 16px; right: 20px;
+  z-index: 100;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.user-info {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: rgba(10,15,30,0.9);
+  border: 1px solid rgba(201,162,39,0.3);
+  border-radius: 20px;
+  padding: 6px 14px;
+}
+
+.user-avatar { font-size: 1rem; }
+
+.user-name {
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: #c9a227;
+  letter-spacing: 1px;
+}
+
+.user-btn {
+  padding: 7px 16px;
+  border: none;
+  border-radius: 20px;
+  font-size: 0.82rem;
+  font-weight: 700;
+  cursor: pointer;
+  letter-spacing: 1px;
+  transition: transform 0.15s, box-shadow 0.15s;
+}
+
+.user-btn:hover { transform: translateY(-1px); }
+
+.btn-login {
+  background: linear-gradient(135deg, #c9a227, #f9ca24);
+  color: #050a14;
+  box-shadow: 0 2px 10px rgba(201,162,39,0.3);
+}
+
+.btn-logout {
+  background: rgba(255,71,87,0.15);
+  color: #ff4757;
+  border: 1px solid rgba(255,71,87,0.3);
+}
+
+/* ── Botón de mazos ── */
+.btn-deck {
+  background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0a2e1a 100%);
+  border: 2px solid #2ed573;
+  box-shadow: 0 4px 20px rgba(46,213,115,0.15);
+  color: #a8d8b2;
+}
+
+.btn-deck:hover {
+  box-shadow: 0 8px 30px rgba(46,213,115,0.35);
+  border-color: #2ed573;
+}

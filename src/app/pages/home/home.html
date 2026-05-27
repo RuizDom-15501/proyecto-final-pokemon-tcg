@@ -1,0 +1,106 @@
+<div class="home-wrapper">
+
+  <!-- Partículas de fondo -->
+  <div class="particles">
+    @for (p of particles; track $index) {
+      <span class="particle"
+        [style.left.%]="p.x"
+        [style.top.%]="p.y"
+        [style.animation-delay.s]="p.delay"
+        [style.width.px]="p.size"
+        [style.height.px]="p.size">
+      </span>
+    }
+  </div>
+
+  <!-- Orbes decorativos -->
+  <div class="orb orb-1"></div>
+  <div class="orb orb-2"></div>
+  <div class="orb orb-3"></div>
+
+  <!-- Barra de usuario -->
+  <div class="user-bar">
+    @if (authService.isAuthenticated()) {
+      <div class="user-info">
+        <span class="user-avatar">🎮</span>
+        <span class="user-name">{{ authService.getUsername() }}</span>
+      </div>
+      <button class="user-btn btn-logout" (click)="logout()">Cerrar Sesión</button>
+    } @else {
+      <button class="user-btn btn-login" (click)="goToLogin()">🔐 Iniciar Sesión</button>
+    }
+  </div>
+
+  <!-- Contenido principal -->
+  <div class="home-content">
+
+    <!-- Logo / Título -->
+    <div class="logo-section">
+      <div class="pokeball-icon">
+        <div class="pokeball-top"></div>
+        <div class="pokeball-middle">
+          <div class="pokeball-center"></div>
+        </div>
+        <div class="pokeball-bottom"></div>
+      </div>
+      <h1 class="game-title">
+        <span class="title-pokemon">Pokémon</span>
+        <span class="title-tactical">Tactical</span>
+        <span class="title-card">Card Game</span>
+      </h1>
+      <p class="game-subtitle">⚔️ Generación IX · Combate Táctico · Cartas Épicas ⚔️</p>
+    </div>
+
+    <!-- Botones de menú -->
+    <div class="menu-buttons">
+      <button class="menu-btn btn-solo" (click)="playSolo()">
+        <span class="btn-icon">⚔️</span>
+        <span class="btn-text">
+          <strong>Jugar Solo</strong>
+          <small>Combate contra la CPU</small>
+        </span>
+        <span class="btn-arrow">›</span>
+      </button>
+
+      <button class="menu-btn btn-deck" (click)="goToDeck()">
+        <span class="btn-icon">🃏</span>
+        <span class="btn-text">
+          <strong>Mis Mazos</strong>
+          <small>Construye y guarda tu mazo</small>
+        </span>
+        <span class="btn-arrow">›</span>
+      </button>
+
+      <button class="menu-btn btn-online" (click)="playOnline()">
+        <span class="btn-icon">🌐</span>
+        <span class="btn-text">
+          <strong>Jugar Online</strong>
+          <small>Matchmaking · Supabase Realtime</small>
+        </span>
+        <span class="btn-arrow">›</span>
+      </button>
+    </div>
+
+    <!-- Pokémon decorativos de Gen 9 -->
+    <div class="deco-pokemon">
+      <div class="deco-card deco-left">
+        <img src="https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/909.png" alt="Fuecoco" />
+        <span>Fuecoco</span>
+      </div>
+      <div class="deco-card deco-center">
+        <img src="https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/1007.png" alt="Koraidon" />
+        <span>Koraidon</span>
+      </div>
+      <div class="deco-card deco-right">
+        <img src="https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/1008.png" alt="Miraidon" />
+        <span>Miraidon</span>
+      </div>
+    </div>
+
+    <!-- Footer info -->
+    <div class="home-footer">
+      <span>Pokémon Gen IX · PokéAPI · Angular 21 · Supabase</span>
+    </div>
+
+  </div>
+</div>

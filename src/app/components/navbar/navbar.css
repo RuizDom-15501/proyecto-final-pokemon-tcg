@@ -1,0 +1,130 @@
+.navbar {
+  position: fixed;
+  top: 0; left: 0; right: 0;
+  z-index: 1000;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 24px;
+  background: rgba(5,10,20,0.95);
+  border-bottom: 1px solid rgba(201,162,39,0.15);
+  backdrop-filter: blur(10px);
+  gap: 16px;
+}
+
+/* ── Brand ── */
+.nav-brand {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  text-decoration: none;
+  color: #c9a227;
+  font-family: 'Cinzel', serif;
+  font-size: 1rem;
+  font-weight: 700;
+  letter-spacing: 2px;
+  flex-shrink: 0;
+}
+
+.nav-pokeball {
+  width: 28px; height: 28px;
+  border-radius: 50%;
+  border: 2px solid #c9a227;
+  position: relative;
+  overflow: hidden;
+}
+
+.npb-top    { position: absolute; top:0; left:0; right:0; height:50%; background: #e84118; }
+.npb-bottom { position: absolute; bottom:0; left:0; right:0; height:50%; background: #1e272e; }
+.npb-band {
+  position: absolute; top:50%; left:0; right:0; height:4px;
+  background: #c9a227; transform: translateY(-50%);
+}
+
+/* ── Links ── */
+.nav-links {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex: 1;
+  justify-content: center;
+}
+
+.nav-links a {
+  text-decoration: none;
+  color: #7a8aaa;
+  font-size: 0.85rem;
+  font-weight: 600;
+  letter-spacing: 1px;
+  padding: 6px 12px;
+  border-radius: 6px;
+  transition: color 0.2s, background 0.2s;
+}
+
+.nav-links a:hover,
+.nav-links a.active {
+  color: #c9a227;
+  background: rgba(201,162,39,0.08);
+}
+
+/* ── Auth ── */
+.nav-auth {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+.nav-user {
+  font-size: 0.8rem;
+  color: #c9a227;
+  font-weight: 700;
+  letter-spacing: 1px;
+}
+
+.nav-btn {
+  padding: 6px 14px;
+  border-radius: 6px;
+  font-size: 0.8rem;
+  font-weight: 700;
+  letter-spacing: 1px;
+  cursor: pointer;
+  text-decoration: none;
+  transition: transform 0.15s, box-shadow 0.15s;
+  border: none;
+  display: inline-block;
+}
+
+.nav-btn:hover { transform: translateY(-1px); }
+
+.nav-login    { background: rgba(201,162,39,0.15); color: #c9a227; border: 1px solid rgba(201,162,39,0.3); }
+.nav-register { background: linear-gradient(135deg,#c9a227,#f9ca24); color: #050a14; }
+.nav-logout   { background: rgba(255,71,87,0.1); color: #ff4757; border: 1px solid rgba(255,71,87,0.3); }
+
+/* ── Responsive ── */
+@media (max-width: 640px) {
+  .nav-links { display: none; }
+  .nav-brand span { display: none; }
+}
+
+/* ── Avatar Google ── */
+.nav-user-info {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.nav-avatar {
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  object-fit: cover;
+  border: 2px solid rgba(201,162,39,0.5);
+  box-shadow: 0 0 8px rgba(201,162,39,0.3);
+  flex-shrink: 0;
+}
+
+.nav-avatar-emoji {
+  font-size: 1.2rem;
+  line-height: 1;
+}

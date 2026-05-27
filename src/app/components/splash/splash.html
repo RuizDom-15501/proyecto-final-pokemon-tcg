@@ -1,0 +1,113 @@
+<div class="splash-wrapper" [class.fade-out]="fadeOut">
+
+  <!-- ══ FONDO GALAXIA ══ -->
+  <div class="galaxy-bg" aria-hidden="true">
+    <div class="nebula nebula-1"></div>
+    <div class="nebula nebula-2"></div>
+    <div class="nebula nebula-3"></div>
+    <div class="nebula nebula-4"></div>
+    <div class="grid-lines"></div>
+  </div>
+
+  <!-- ══ ESTRELLAS ══ -->
+  <div class="stars-layer" aria-hidden="true">
+    @for (s of stars; track s.id) {
+      <div class="star"
+        [style.left.%]="s.x"
+        [style.top.%]="s.y"
+        [style.width.px]="s.size"
+        [style.height.px]="s.size"
+        [style.animation-delay.s]="s.delay"
+        [style.animation-duration.s]="s.duration">
+      </div>
+    }
+  </div>
+
+  <!-- ══ PARTÍCULAS FLOTANTES ══ -->
+  <div class="particles-layer" aria-hidden="true">
+    @for (p of particles; track p.id) {
+      <div class="particle"
+        [style.left.%]="p.x"
+        [style.top.%]="p.y"
+        [style.width.px]="p.size"
+        [style.height.px]="p.size"
+        [style.background]="p.color"
+        [style.box-shadow]="'0 0 ' + (p.size * 2) + 'px ' + p.color"
+        [style.animation-delay.s]="p.delay"
+        [style.animation-duration.s]="p.duration">
+      </div>
+    }
+  </div>
+
+  <!-- ══ CONTENIDO CENTRAL (glassmorphism) ══ -->
+  <div class="splash-glass">
+
+    <!-- Pokéball animada -->
+    <div class="pokeball-wrap" aria-hidden="true">
+      <div class="pokeball-ring ring-outer"></div>
+      <div class="pokeball-ring ring-mid"></div>
+      <div class="pokeball-ring ring-inner"></div>
+      <div class="pokeball-halo"></div>
+      <div class="pokeball">
+        <div class="pb-top"></div>
+        <div class="pb-bottom"></div>
+        <div class="pb-band">
+          <div class="pb-btn"></div>
+        </div>
+        <div class="pb-shine"></div>
+      </div>
+    </div>
+
+    <!-- Logo con animación de entrada escalonada -->
+    <div class="logo-block" [class.logo-visible]="logoVisible">
+      <div class="logo-pokemon-wrap">
+        <h1 class="logo-pokemon">POKÉMON</h1>
+        <div class="logo-glow-bar"></div>
+      </div>
+      <div class="logo-tcg">
+        <span class="logo-tactical">TACTICAL</span>
+        <span class="logo-separator">·</span>
+        <span class="logo-card">CARD GAME</span>
+      </div>
+      <div class="logo-underline"></div>
+    </div>
+
+    <!-- Barra de progreso premium -->
+    <div class="progress-section">
+      <div class="progress-track" role="progressbar" [attr.aria-valuenow]="progress" aria-valuemin="0" aria-valuemax="100">
+        <div class="progress-fill" [style.width.%]="progress">
+          <div class="progress-glow"></div>
+          <div class="progress-shimmer"></div>
+        </div>
+        <div class="progress-segments" aria-hidden="true">
+          @for (seg of [0,1,2,3,4,5,6,7,8,9]; track seg) {
+            <div class="seg"></div>
+          }
+        </div>
+      </div>
+      <div class="progress-labels">
+        <span class="progress-pct">{{ progress }}%</span>
+        <span class="progress-status">{{ statusText }}</span>
+      </div>
+    </div>
+
+    <!-- Indicador de estado -->
+    <div class="status-row" aria-live="polite">
+      <span class="status-dot"></span>
+      <span class="status-msg">{{ statusText }}</span>
+    </div>
+
+    <!-- Botón música -->
+    <button class="music-btn" (click)="playAmbient()" type="button" aria-label="Reproducir música de intro">
+      <span class="music-icon">🎵</span>
+      <span>Música</span>
+    </button>
+
+  </div>
+
+  <!-- ══ FOOTER ══ -->
+  <footer class="splash-footer" aria-hidden="true">
+    Pokémon Gen IX &nbsp;·&nbsp; Angular 21 &nbsp;·&nbsp; Supabase
+  </footer>
+
+</div>
