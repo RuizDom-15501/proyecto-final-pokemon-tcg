@@ -543,6 +543,11 @@ export class GameComponent implements OnInit, OnDestroy {
   // ══════════════════════════════════════════
 
   realizarAtaque(atacante: PokemonCard, bando: 'jugador' | 'cpu') {
+    // Guard: nunca ejecutar con atacante null
+    if (!atacante) {
+      console.log('[NULL TARGET] realizarAtaque — atacante null, bando:', bando);
+      return;
+    }
     if (this.estaBloqueada(atacante)) {
       this.agregarLog(`❌ ${atacante.nombre} está paralizado.`);
       return;
@@ -573,11 +578,13 @@ export class GameComponent implements OnInit, OnDestroy {
         this.verificarGanador();
       }
     }
-    // verificarGanador ya se llama dentro de infligirDanio si hay KO
-    // Solo llamarlo aquí si no hubo KO (defensor sigue vivo)
   }
 
   realizarHabilidad(atacante: PokemonCard, bando: 'jugador' | 'cpu') {
+    if (!atacante) {
+      console.log('[NULL TARGET] realizarHabilidad — atacante null, bando:', bando);
+      return;
+    }
     if (this.estaBloqueada(atacante)) return;
     const objetivo = bando === 'jugador'
       ? (this.cpuActive ?? undefined)
@@ -591,23 +598,25 @@ export class GameComponent implements OnInit, OnDestroy {
     atacante: PokemonCard, defensor: PokemonCard,
     dmgBase: number, lado: 'player' | 'cpu'
   ) {
+    if (!atacante || !defensor) {
+      console.log('[NULL TARGET] infligirDanio — atacante:', atacante?.nombre ?? 'null',
+        '| defensor:', defensor?.nombre ?? 'null');
+      return;
+    }
+
     const impacto = Math.max(dmgBase - this.calcularDefensaFinal(defensor), 80);
     defensor.vidaActual -= impacto;
 
-    // Acumular daño del jugador para estadísticas
     if (lado === 'cpu') this.totalDamageDealt += impacto;
 
     this.triggerDamageEffect(impacto, lado);
     this.triggerAttackAnim(atacante.tipo, lado);
 
-    // Partículas de impacto en el centro de la pantalla
     const typeColor = this.getTypeColor(atacante.tipo);
     const container = document.querySelector('.battle-zone') as HTMLElement | null;
     if (container) {
       const rect = container.getBoundingClientRect();
-      const cx   = rect.width  / 2;
-      const cy   = rect.height / 2;
-      this.animService.spawnImpactParticles(container, cx, cy, typeColor, 10);
+      this.animService.spawnImpactParticles(container, rect.width / 2, rect.height / 2, typeColor, 10);
     }
 
     this.agregarLog(`💥 ${atacante.nombre} → ${defensor.nombre}: ${impacto} daño.`);
@@ -621,30 +630,41 @@ export class GameComponent implements OnInit, OnDestroy {
   private procesarKO(derrotado: PokemonCard, lado: 'player' | 'cpu') {
     this.mostrarKO(derrotado.nombre);
     this.agregarLog(`💀 ¡${derrotado.nombre} fue derrotado!`);
+    console.log('[KO]', derrotado.nombre, '| lado:', lado,
+      '| bench cpu:', this.cpuBench.length, '| bench player:', this.playerBench.length);
 
     if (lado === 'cpu') {
-      // Solo poner null la activa de la CPU — NO tocar la del jugador
-      this.cpuActive = null;
+      // Reemplazo SÍNCRONO — sin setTimeout para evitar estado null durante publish
       if (this.cpuBench.length > 0) {
-        setTimeout(() => {
-          this.cpuActive = this.cpuBench.shift()!;
-          this.agregarLog(`🔄 CPU envía a ${this.cpuActive!.nombre}.`);
-        }, 700);
+        this.cpuActive = this.cpuBench.shift()!;
+        this.agregarLog(`🔄 CPU envía a ${this.cpuActive.nombre}.`);
+        console.log('[KO] cpu reemplazada por:', this.cpuActive.nombre);
       } else {
+        this.cpuActive = null;
         this.agregarLog('⚠️ CPU sin reserva. Ataques van a vida global.');
+        console.log('[KO] cpu sin reserva — cpuActive = null');
       }
     } else {
-      // Solo poner null la activa del jugador — NO tocar la de la CPU
-      this.playerActive = null;
+      // Reemplazo SÍNCRONO
       if (this.playerBench.length > 0) {
-        setTimeout(() => {
-          this.playerActive = this.playerBench.shift()!;
-          this.agregarLog(`🔄 ${this.playerActive!.nombre} entra al campo.`);
-        }, 700);
+        this.playerActive = this.playerBench.shift()!;
+        this.agregarLog(`🔄 ${this.playerActive.nombre} entra al campo.`);
+        console.log('[KO] player reemplazado por:', this.playerActive.nombre);
       } else {
+        this.playerActive = null;
         this.agregarLog('⚠️ Sin reserva. Ataques van a tu vida global.');
+        console.log('[KO] player sin reserva — playerActive = null');
       }
     }
+
+    console.log('[ACTIVE STATE] tras KO | playerActive:', this.playerActive?.nombre ?? 'null',
+      '| cpuActive:', this.cpuActive?.nombre ?? 'null');
+  }
+
+  estaBloqueada(carta: PokemonCard | null | undefined): boolean {
+    if (!carta) return false;
+    // efectosActivos puede ser undefined si la carta viene de un snapshot parcial
+    return carta.efectosActivos?.some(e => e.bloqueaAtaque === true) ?? false;
   }
 
   // ══════════════════════════════════════════
@@ -665,10 +685,6 @@ export class GameComponent implements OnInit, OnDestroy {
       if (e.modificadorStats?.defensa) base += e.modificadorStats.defensa!;
     });
     return base;
-  }
-
-  estaBloqueada(carta: PokemonCard): boolean {
-    return carta.efectosActivos?.some(e => e.bloqueaAtaque === true) ?? false;
   }
 
   // ══════════════════════════════════════════
@@ -726,6 +742,8 @@ export class GameComponent implements OnInit, OnDestroy {
     c.ataque     = s.ataque;
     c.defensa    = s.defensa;
     c.imagen     = s.imagen;
+    // Garantizar que efectosActivos siempre sea un array (nunca undefined)
+    if (!c.efectosActivos) c.efectosActivos = [];
     return c;
   }
 
@@ -840,48 +858,61 @@ export class GameComponent implements OnInit, OnDestroy {
 
   // ── Reconstruir tablero desde snapshot del host ─────────────────────────
   private aplicarSnapshotCompleto(state: GameState): void {
-    if (state.playerActive) {
-      this.playerActive = this.fromSnapshotExact(state.playerActive);
-    } else {
-      this.playerActive = null;
-    }
-    this.playerBench = (state.playerBench ?? []).map(s => this.fromSnapshotExact(s));
+    console.log('[SNAPSHOT] aplicando | playerActive:', state.playerActive?.nombre ?? 'null',
+      '| cpuActive:', state.cpuActive?.nombre ?? 'null',
+      '| playerBench:', state.playerBench?.length ?? 0,
+      '| cpuBench:', state.cpuBench?.length ?? 0);
 
-    if (state.cpuActive) {
-      this.cpuActive = this.fromSnapshotExact(state.cpuActive);
-    } else {
-      this.cpuActive = null;
-    }
-    this.cpuBench = (state.cpuBench ?? []).map(s => this.fromSnapshotExact(s));
+    this.playerActive = state.playerActive ? this.fromSnapshotExact(state.playerActive) : null;
+    this.playerBench  = (state.playerBench ?? []).map(s => this.fromSnapshotExact(s));
+    this.cpuActive    = state.cpuActive    ? this.fromSnapshotExact(state.cpuActive)    : null;
+    this.cpuBench     = (state.cpuBench    ?? []).map(s => this.fromSnapshotExact(s));
 
     this.playerLife  = state.playerLife;
     this.cpuLife     = state.cpuLife;
     this.roundNumber = state.roundNumber;
     this.turno       = state.turno;
 
-    console.log('[SYNC] snapshot aplicado | playerActive:', this.playerActive?.nombre,
-      '| cpuActive:', this.cpuActive?.nombre,
-      '| playerLife:', this.playerLife, '| cpuLife:', this.cpuLife);
+    console.log('[SNAPSHOT] aplicado | playerActive:', this.playerActive?.nombre ?? 'null',
+      '| cpuActive:', this.cpuActive?.nombre ?? 'null',
+      '| playerLife:', this.playerLife, '| cpuLife:', this.cpuLife,
+      '| turno:', this.turno);
   }
 
   // ── Host: procesa intención del guest y ejecuta la acción ───────────────
   private procesarIntencionGuest(intent: GuestIntent): void {
     console.log('[SYNC] host procesando intent del guest:', intent.type, '| cardId:', intent.cardId);
+    console.log('[ACTIVE STATE] antes de intent | playerActive:', this.playerActive?.nombre ?? 'null',
+      '| cpuActive:', this.cpuActive?.nombre ?? 'null');
 
     if (intent.type === 'attack') {
-      // La carta del guest es cpuActive (el guest controla el lado cpu)
-      if (this.cpuActive && this.cpuActive.id === intent.cardId) {
-        this.realizarAtaque(this.cpuActive, 'cpu');
-      } else {
-        // Buscar en bench por si cambió
-        const carta = this.cpuBench.find(c => c.id === intent.cardId) ?? this.cpuActive;
-        if (carta) this.realizarAtaque(carta, 'cpu');
-      }
-    } else if (intent.type === 'ability') {
-      const carta = this.cpuActive?.id === intent.cardId
+      // El guest controla el lado cpu — buscar su carta activa
+      const carta = (this.cpuActive?.id === intent.cardId)
         ? this.cpuActive
-        : this.cpuBench.find(c => c.id === intent.cardId) ?? this.cpuActive;
-      if (carta) this.realizarHabilidad(carta, 'cpu');
+        : (this.cpuBench.find(c => c.id === intent.cardId) ?? this.cpuActive);
+
+      if (!carta) {
+        console.log('[NULL TARGET] procesarIntencionGuest attack — cpuActive null, ignorando');
+        // Aun así pasar turno y publicar para no congelar
+        this.pasarTurnoOnlineAlHost();
+        this.publicarEstadoCompleto('[Guest] ataque ignorado (sin activa)');
+        return;
+      }
+      this.realizarAtaque(carta, 'cpu');
+
+    } else if (intent.type === 'ability') {
+      const carta = (this.cpuActive?.id === intent.cardId)
+        ? this.cpuActive
+        : (this.cpuBench.find(c => c.id === intent.cardId) ?? this.cpuActive);
+
+      if (!carta) {
+        console.log('[NULL TARGET] procesarIntencionGuest ability — cpuActive null, ignorando');
+        this.pasarTurnoOnlineAlHost();
+        this.publicarEstadoCompleto('[Guest] habilidad ignorada (sin activa)');
+        return;
+      }
+      this.realizarHabilidad(carta, 'cpu');
+
     } else if (intent.type === 'switch') {
       const nueva = this.cpuBench.find(c => c.id === intent.cardId);
       if (nueva) {
@@ -890,10 +921,17 @@ export class GameComponent implements OnInit, OnDestroy {
         this.cpuBench  = this.cpuBench.filter(c => c.id !== nueva.id);
         if (anterior) this.cpuBench.push(anterior);
         this.agregarLog(`🔄 [Guest] ${nueva.nombre} entra al campo.`);
+        console.log('[SYNC] guest switch → cpuActive:', nueva.nombre);
+      } else {
+        console.log('[NULL TARGET] procesarIntencionGuest switch — carta no encontrada en bench');
       }
     }
 
     this.verificarGanador();
+
+    console.log('[ACTIVE STATE] tras intent | playerActive:', this.playerActive?.nombre ?? 'null',
+      '| cpuActive:', this.cpuActive?.nombre ?? 'null');
+
     this.pasarTurnoOnlineAlHost();
     this.publicarEstadoCompleto(`[Guest] ${intent.type}`);
   }
