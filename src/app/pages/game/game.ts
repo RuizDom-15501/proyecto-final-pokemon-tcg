@@ -94,13 +94,20 @@ export class GameComponent implements OnInit, OnDestroy {
   // ── Online multiplayer (opcional) ──
   // Si no hay roomId, el juego funciona normal contra CPU
   private roomId:              string | null = null;
-  private onlineRol:           'host' | 'guest' | null = null;
+  onlineRol:                   'host' | 'guest' | null = null;
   private isApplyingRemoteState = false;   // guard anti-loop
   private lastRemoteTimestamp   = 0;       // ignora estados más viejos
   roomCode = '';
   get isOnline(): boolean { return !!this.roomId; }
 
-  /** host juega en turno 'jugador', guest juega en turno 'cpu' */
+  /**
+   * En modo online el tablero es SIMÉTRICO:
+   *   host  → controla el lado 'jugador' (cartas de abajo)
+   *   guest → controla el lado 'cpu'     (cartas de arriba)
+   *
+   * Ambos ven el mismo tablero pero desde perspectivas opuestas.
+   * El turno alterna: 'jugador' (host actúa) → 'cpu' (guest actúa) → ...
+   */
   protected esMiTurnoOnline(): boolean {
     if (!this.isOnline) return true;
     if (this.onlineRol === 'host')  return this.turno === 'jugador';
@@ -330,6 +337,8 @@ export class GameComponent implements OnInit, OnDestroy {
     this.soundService.play('click');
     this.cartaSeleccionada = carta;
     this.mostrarMenuAcciones = true;
+    console.log('[ONLINE ACTION] carta seleccionada:', carta.nombre,
+      '| rol:', this.onlineRol ?? 'local');
   }
 
   cerrarAcciones() {
@@ -341,42 +350,84 @@ export class GameComponent implements OnInit, OnDestroy {
   ejecutarAtaque() {
     if (!this.cartaSeleccionada) return;
     this.soundService.play('attack');
-    this.realizarAtaque(this.cartaSeleccionada, 'jugador');
-    this.cerrarAcciones();
-    if (this.isOnline) {
+
+    if (this.isOnline && this.onlineRol === 'guest') {
+      // Guest: su atacante es cpuActive, su objetivo es playerActive
+      console.log('[ONLINE ACTION] guest ejecutarAtaque →', this.cartaSeleccionada.nombre);
+      this.realizarAtaque(this.cartaSeleccionada, 'cpu');
+      this.cerrarAcciones();
       this.publicarEstado(`${this.cartaSeleccionada?.nombre ?? '?'} atacó`);
+      if (!this.gameOver) this.pasarTurnoOnlineAlHost();
+    } else {
+      // Host o modo local: atacante es playerActive, objetivo es cpuActive
+      console.log('[ONLINE ACTION] host/local ejecutarAtaque →', this.cartaSeleccionada.nombre);
+      this.realizarAtaque(this.cartaSeleccionada, 'jugador');
+      this.cerrarAcciones();
+      if (this.isOnline) {
+        this.publicarEstado(`${this.cartaSeleccionada?.nombre ?? '?'} atacó`);
+        if (!this.gameOver) this.pasarTurnoOnlineAlGuest();
+      } else {
+        if (!this.gameOver) this.pasarTurnoCPU();
+      }
     }
-    if (!this.gameOver) this.pasarTurnoCPU();
   }
 
   ejecutarHabilidad() {
     if (!this.cartaSeleccionada) return;
     this.soundService.play('ability');
-    this.realizarHabilidad(this.cartaSeleccionada, 'jugador');
-    this.cerrarAcciones();
-    if (this.isOnline) {
+
+    if (this.isOnline && this.onlineRol === 'guest') {
+      console.log('[ONLINE ACTION] guest ejecutarHabilidad →', this.cartaSeleccionada.nombre);
+      this.realizarHabilidad(this.cartaSeleccionada, 'cpu');
+      this.cerrarAcciones();
       this.publicarEstado(`${this.cartaSeleccionada?.nombre ?? '?'} usó habilidad`);
+      if (!this.gameOver) this.pasarTurnoOnlineAlHost();
+    } else {
+      console.log('[ONLINE ACTION] host/local ejecutarHabilidad →', this.cartaSeleccionada.nombre);
+      this.realizarHabilidad(this.cartaSeleccionada, 'jugador');
+      this.cerrarAcciones();
+      if (this.isOnline) {
+        this.publicarEstado(`${this.cartaSeleccionada?.nombre ?? '?'} usó habilidad`);
+        if (!this.gameOver) this.pasarTurnoOnlineAlGuest();
+      } else {
+        if (!this.gameOver) this.pasarTurnoCPU();
+      }
     }
-    if (!this.gameOver) this.pasarTurnoCPU();
   }
 
   /** Cambiar Pokémon activo desde la reserva — también pasa el turno */
   cambiarActiva(carta: PokemonCard) {
     if (!this.puedeActuarJugador()) return;
     this.soundService.play('click');
-    const anterior = this.playerActive;
-    this.playerActive = carta;
-    this.playerBench  = this.playerBench.filter(c => c.id !== carta.id);
-    if (anterior) this.playerBench.push(anterior);
-    this.agregarLog(`🔄 ${carta.nombre} entra al campo.`);
-    setTimeout(() => {
-      const el = document.querySelector('.player-card') as HTMLElement | null;
-      this.animService.cardEnterAnim(el);
-    }, 50);
-    if (this.isOnline) {
+
+    if (this.isOnline && this.onlineRol === 'guest') {
+      // Guest controla el lado cpu
+      console.log('[ONLINE ACTION] guest cambiarActiva →', carta.nombre);
+      const anterior = this.cpuActive;
+      this.cpuActive = carta;
+      this.cpuBench  = this.cpuBench.filter(c => c.id !== carta.id);
+      if (anterior) this.cpuBench.push(anterior);
+      this.agregarLog(`🔄 [Guest] ${carta.nombre} entra al campo.`);
       this.publicarEstado(`Cambió a ${carta.nombre}`);
+      if (!this.gameOver) this.pasarTurnoOnlineAlHost();
+    } else {
+      // Host o modo local: controla el lado jugador
+      const anterior = this.playerActive;
+      this.playerActive = carta;
+      this.playerBench  = this.playerBench.filter(c => c.id !== carta.id);
+      if (anterior) this.playerBench.push(anterior);
+      this.agregarLog(`🔄 ${carta.nombre} entra al campo.`);
+      setTimeout(() => {
+        const el = document.querySelector('.player-card') as HTMLElement | null;
+        this.animService.cardEnterAnim(el);
+      }, 50);
+      if (this.isOnline) {
+        this.publicarEstado(`Cambió a ${carta.nombre}`);
+        if (!this.gameOver) this.pasarTurnoOnlineAlGuest();
+      } else {
+        this.pasarTurnoCPU();
+      }
     }
-    this.pasarTurnoCPU();
   }
 
   // Alias por compatibilidad
@@ -390,11 +441,41 @@ export class GameComponent implements OnInit, OnDestroy {
   // ══════════════════════════════════════════
 
   pasarTurnoCPU() {
+    // En modo online NUNCA ejecutar la IA local — el "turno cpu" es el turno del guest
+    if (this.isOnline) return;
+
     this.turno = 'cpu';
     this.cpuThinking = true;
     this.soundService.play('turnChange');
     this.triggerTurnChangeAnim();
     this.cpuTimer = setTimeout(() => this.ejecutarTurnoCPU(), 1500);
+  }
+
+  /**
+   * Online: host acaba de actuar → pasa turno al guest (turno = 'cpu').
+   * Publica el estado para que el guest lo reciba y sepa que puede actuar.
+   */
+  private pasarTurnoOnlineAlGuest(): void {
+    this.turno = 'cpu';
+    this.roundNumber++;
+    this.soundService.play('turnChange');
+    this.triggerTurnChangeAnim();
+    this.agregarLog(`— Ronda ${this.roundNumber} — Turno del Guest`);
+    console.log('[TURN] host pasó turno al guest — turno=cpu, ronda', this.roundNumber);
+    this.publicarEstado('__turno_guest__');
+  }
+
+  /**
+   * Online: guest acaba de actuar → pasa turno al host (turno = 'jugador').
+   * Publica el estado para que el host lo reciba y sepa que puede actuar.
+   */
+  private pasarTurnoOnlineAlHost(): void {
+    this.turno = 'jugador';
+    this.soundService.play('turnChange');
+    this.triggerTurnChangeAnim();
+    this.agregarLog(`— Turno del Host`);
+    console.log('[TURN] guest pasó turno al host — turno=jugador');
+    this.publicarEstado('__turno_host__');
   }
 
   ejecutarTurnoCPU() {
@@ -622,11 +703,16 @@ export class GameComponent implements OnInit, OnDestroy {
       senderRole:  this.onlineRol ?? ''
     };
 
+    console.log('[ONLINE] publicarEstado →', lastAction,
+      '| turno:', state.turno,
+      '| rol:', state.senderRole,
+      '| ts:', state.timestamp);
+
     this.onlineRoom.pushState(this.roomId, state);
   }
 
   private aplicarEstadoRemoto(state: GameState): void {
-    // Guards en orden estricto — evitan loops y estados inválidos
+    // ── Guards en orden estricto ──────────────────────────────────────────
     if (!state || state.playerLife === undefined)    return;
     if (state.lastAction === '__guest_joined__')      return;
     if (this.isApplyingRemoteState)                  return;
@@ -636,20 +722,40 @@ export class GameComponent implements OnInit, OnDestroy {
     this.isApplyingRemoteState = true;
     this.lastRemoteTimestamp   = state.timestamp;
 
+    console.log('[REMOTE STATE] recibido de', state.senderRole,
+      '| acción:', state.lastAction,
+      '| turno remoto:', state.turno,
+      '| playerLife:', state.playerLife,
+      '| cpuLife:', state.cpuLife);
+
     try {
       // Efectos visuales de daño ANTES de actualizar HP
       const dmgPlayer = state.playerLife < this.playerLife ? this.playerLife - state.playerLife : 0;
       const dmgCpu    = state.cpuLife    < this.cpuLife    ? this.cpuLife    - state.cpuLife    : 0;
 
-      // Aplicar cambios mínimos
+      // Aplicar cambios de estado
       this.playerLife  = state.playerLife;
       this.cpuLife     = state.cpuLife;
       this.roundNumber = state.roundNumber;
-      this.turno       = state.turno;
 
-      // Log de la acción del oponente
-      if (state.lastAction) {
-        const rol = this.onlineRol === 'host' ? 'Guest' : 'Host';
+      // ── Sincronizar turno ─────────────────────────────────────────────
+      // El turno publicado por el oponente es el turno que ELLOS establecieron
+      // después de actuar. Lo adoptamos directamente.
+      const turnoAnterior = this.turno;
+      this.turno = state.turno;
+
+      if (turnoAnterior !== this.turno) {
+        this.soundService.play('turnChange');
+        this.triggerTurnChangeAnim();
+        console.log('[TURN] turno cambió remotamente:', turnoAnterior, '→', this.turno,
+          '| esMiTurno:', this.esMiTurnoOnline());
+      }
+
+      // Log de la acción del oponente (omitir mensajes internos de turno)
+      if (state.lastAction &&
+          state.lastAction !== '__turno_guest__' &&
+          state.lastAction !== '__turno_host__') {
+        const rol = state.senderRole === 'host' ? 'Host' : 'Guest';
         this.agregarLog(`🌐 [${rol}] ${state.lastAction}`);
       }
 
@@ -667,7 +773,6 @@ export class GameComponent implements OnInit, OnDestroy {
         }
       }
     } finally {
-      // queueMicrotask libera el flag DESPUÉS del ciclo actual
       queueMicrotask(() => { this.isApplyingRemoteState = false; });
     }
   }
@@ -810,10 +915,16 @@ export class GameComponent implements OnInit, OnDestroy {
 
   puedeActuarJugador(): boolean {
     if (this.gameOver || this.cpuThinking) return false;
-    if (this.turno !== 'jugador') return false;
-    // En modo online, solo puede actuar quien tiene el turno
-    if (this.isOnline && !this.esMiTurnoOnline()) return false;
-    return true;
+    if (this.isOnline) {
+      // En modo online: cada jugador actúa en su turno asignado
+      const puedo = this.esMiTurnoOnline();
+      console.log('[TURN] puedeActuarJugador →', puedo,
+        '| rol:', this.onlineRol,
+        '| turno:', this.turno);
+      return puedo;
+    }
+    // Modo local: solo actúa en turno 'jugador'
+    return this.turno === 'jugador';
   }
 
   get cpuExposed(): boolean    { return !this.cpuActive    && this.cpuBench.length    === 0; }

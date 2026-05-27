@@ -92,8 +92,15 @@
           <div class="field-label">Campo Enemigo</div>
           <div class="active-slot" [class.empty]="!cpuActive" [class.exposed-slot]="cpuExposed">
             @if (cpuActive) {
-              <div class="battle-card cpu-card" [class.paralyzed]="estaBloqueada(cpuActive)" [class.shake]="shakeCpu">
+              <div class="battle-card cpu-card"
+                   [class.paralyzed]="estaBloqueada(cpuActive)"
+                   [class.shake]="shakeCpu"
+                   [class.can-act]="isOnline && onlineRol === 'guest' && puedeActuarJugador()"
+                   (click)="isOnline && onlineRol === 'guest' ? seleccionarCarta(cpuActive!) : null">
                 <div class="card-glow cpu-glow"></div>
+                @if (isOnline && onlineRol === 'guest' && puedeActuarJugador()) {
+                  <div class="card-clickable-hint">Toca para actuar</div>
+                }
                 <div class="status-row">
                   @for (eff of cpuActive.efectosActivos; track eff.id) {
                     <span class="status-badge" [class.debuff]="eff.tipo === 'debuff'" [class.buff]="eff.tipo === 'buff'">{{ eff.nombre }}</span>
@@ -132,7 +139,10 @@
           <!-- Reserva CPU -->
           <div class="bench-row">
             @for (b of cpuBench; track b.id) {
-              <div class="bench-card cpu-bench">
+              <div class="bench-card cpu-bench"
+                   [class.player-bench]="isOnline && onlineRol === 'guest'"
+                   [class.bench-disabled]="isOnline && onlineRol === 'guest' && !puedeActuarJugador()"
+                   (click)="isOnline && onlineRol === 'guest' ? cambiarActiva(b) : null">
                 <img [src]="b.imagen" [alt]="b.nombre" />
                 <span>{{ b.nombre }}</span>
                 <div class="bench-hp-bar">
@@ -168,7 +178,7 @@
                    [class.can-act]="puedeActuarJugador()"
                    (click)="seleccionarCarta(playerActive)">
                 <div class="card-glow player-glow"></div>
-                @if (puedeActuarJugador()) {
+                @if (puedeActuarJugador() && (!isOnline || onlineRol === 'host')) {
                   <div class="card-clickable-hint">Toca para actuar</div>
                 }
                 <div class="status-row">
