@@ -95,11 +95,25 @@ export class GameComponent implements OnInit, OnDestroy {
   // Si no hay roomId, el juego funciona normal contra CPU
   private roomId:               string | null = null;
   onlineRol:                    'host' | 'guest' | null = null;
-  private isApplyingRemoteState = false;   // guard anti-loop
-  private lastRemoteTimestamp   = 0;       // ignora estados más viejos
-  private publishTimer:         any = null; // debounce de publicarEstado
+  private isApplyingRemoteState = false;
+  private lastRemoteTimestamp   = 0;
+  private publishTimer:         any = null;
+  private antiFreezeTimer:      any = null;  // anti-deadlock watchdog
   roomCode = '';
+
+  // ── HUD online — estado visible para el jugador ──
+  onlineSyncStatus: 'idle' | 'syncing' | 'waiting' | 'reconnecting' = 'idle';
+
   get isOnline(): boolean { return !!this.roomId; }
+
+  /** Texto de estado para el HUD online */
+  get onlineTurnLabel(): string {
+    if (!this.isOnline) return '';
+    if (this.onlineSyncStatus === 'syncing')      return '⏳ Sincronizando...';
+    if (this.onlineSyncStatus === 'reconnecting') return '🔄 Reconectando...';
+    if (this.esMiTurnoOnline())                   return '⚔️ Tu turno';
+    return '⏳ Esperando al rival...';
+  }
 
   /**
    * En modo online el tablero es SIMÉTRICO:
@@ -184,6 +198,7 @@ export class GameComponent implements OnInit, OnDestroy {
     clearTimeout(this.flashTimer);
     clearTimeout(this.turnAnimTimer);
     clearTimeout(this.publishTimer);
+    clearTimeout(this.antiFreezeTimer);
     this.limpiarOnline();
   }
 
@@ -198,7 +213,10 @@ export class GameComponent implements OnInit, OnDestroy {
       this.isApplyingRemoteState = false;
       this.lastRemoteTimestamp = 0;
       clearTimeout(this.publishTimer);
-      this.publishTimer = null;
+      clearTimeout(this.antiFreezeTimer);
+      this.publishTimer    = null;
+      this.antiFreezeTimer = null;
+      this.onlineSyncStatus = 'idle';
     }
   }
 
@@ -390,18 +408,18 @@ export class GameComponent implements OnInit, OnDestroy {
   ejecutarAtaque() {
     if (!this.cartaSeleccionada) return;
     this.soundService.play('attack');
-    const nombre = this.cartaSeleccionada.nombre;
-    const cardId = this.cartaSeleccionada.id;
+    // Guardar referencia ANTES de cerrarAcciones (que la pone a null)
+    const carta  = this.cartaSeleccionada;
+    const nombre = carta.nombre;
+    const cardId = carta.id;
     this.cerrarAcciones();
 
     if (this.isOnline && this.onlineRol === 'guest') {
-      // ── GUEST: solo envía intención — NO ejecuta lógica local ──────────
       console.log('[ONLINE ACTION] guest → intent attack:', nombre);
       this.enviarIntencionGuest({ type: 'attack', cardId });
     } else {
-      // ── HOST / LOCAL: ejecuta lógica real ───────────────────────────────
       console.log('[ONLINE ACTION] host/local ejecutarAtaque →', nombre);
-      this.realizarAtaque(this.cartaSeleccionada!, 'jugador');
+      this.realizarAtaque(carta, 'jugador');
       if (this.isOnline) {
         if (!this.gameOver) this.pasarTurnoOnlineAlGuest();
         this.publicarEstadoCompleto(`${nombre} atacó`);
@@ -414,18 +432,18 @@ export class GameComponent implements OnInit, OnDestroy {
   ejecutarHabilidad() {
     if (!this.cartaSeleccionada) return;
     this.soundService.play('ability');
-    const nombre = this.cartaSeleccionada.nombre;
-    const cardId = this.cartaSeleccionada.id;
+    // Guardar referencia ANTES de cerrarAcciones
+    const carta  = this.cartaSeleccionada;
+    const nombre = carta.nombre;
+    const cardId = carta.id;
     this.cerrarAcciones();
 
     if (this.isOnline && this.onlineRol === 'guest') {
-      // ── GUEST: solo envía intención ─────────────────────────────────────
       console.log('[ONLINE ACTION] guest → intent ability:', nombre);
       this.enviarIntencionGuest({ type: 'ability', cardId });
     } else {
-      // ── HOST / LOCAL ─────────────────────────────────────────────────────
       console.log('[ONLINE ACTION] host/local ejecutarHabilidad →', nombre);
-      this.realizarHabilidad(this.cartaSeleccionada!, 'jugador');
+      this.realizarHabilidad(carta, 'jugador');
       if (this.isOnline) {
         if (!this.gameOver) this.pasarTurnoOnlineAlGuest();
         this.publicarEstadoCompleto(`${nombre} usó habilidad`);
@@ -749,11 +767,13 @@ export class GameComponent implements OnInit, OnDestroy {
 
   // ── Host: publica estado completo (cartas + vida + turno) ───────────────
   private publicarEstadoCompleto(lastAction: string): void {
-    if (!this.roomId || this.isApplyingRemoteState) return;
+    if (!this.roomId) return;
+    // NO bloquear por isApplyingRemoteState — si el flag quedó atascado, publicar igual
+    // El guard de senderRole en el receptor evita el eco
 
     clearTimeout(this.publishTimer);
     this.publishTimer = setTimeout(() => {
-      if (!this.roomId || this.isApplyingRemoteState) return;
+      if (!this.roomId) return;
 
       const state: GameState = {
         turno:        this.turno,
@@ -774,8 +794,26 @@ export class GameComponent implements OnInit, OnDestroy {
       console.log('[PUBLISH] host → estado completo | action:', lastAction,
         '| turno:', state.turno, '| ts:', state.timestamp);
 
-      this.onlineRoom.pushState(this.roomId!, state);
+      this.onlineSyncStatus = 'syncing';
+      this.onlineRoom.pushState(this.roomId!, state).then(() => {
+        this.onlineSyncStatus = 'idle';
+      });
+
+      // Anti-freeze: si en 8s no llega respuesta del guest, resetear flag
+      this.resetAntiFreezeTimer();
     }, 80);
+  }
+
+  /** Watchdog: si isApplyingRemoteState queda atascado, liberarlo */
+  private resetAntiFreezeTimer(): void {
+    clearTimeout(this.antiFreezeTimer);
+    this.antiFreezeTimer = setTimeout(() => {
+      if (this.isApplyingRemoteState) {
+        console.log('[DEADLOCK] anti-freeze: liberando isApplyingRemoteState atascado');
+        this.isApplyingRemoteState = false;
+        this.onlineSyncStatus = 'idle';
+      }
+    }, 8000);
   }
 
   // ── Guest: envía intención al host (no modifica estado local) ───────────
@@ -938,15 +976,20 @@ export class GameComponent implements OnInit, OnDestroy {
 
   // ── Receptor de eventos realtime ────────────────────────────────────────
   private aplicarEstadoRemoto(state: GameState): void {
-    // Guards
     if (!state || state.playerLife === undefined)    return;
     if (state.lastAction === '__guest_joined__')      return;
-    if (this.isApplyingRemoteState)                  return;
     if (state.senderRole === this.onlineRol)         return;  // ignorar propios
     if (state.timestamp <= this.lastRemoteTimestamp) return;  // ignorar viejos
 
+    // Si el flag está activo, liberarlo antes de continuar (evita deadlock)
+    if (this.isApplyingRemoteState) {
+      console.log('[DEADLOCK] aplicarEstadoRemoto — flag activo, forzando liberación');
+      this.isApplyingRemoteState = false;
+    }
+
     this.isApplyingRemoteState = true;
     this.lastRemoteTimestamp   = state.timestamp;
+    this.onlineSyncStatus      = 'syncing';
 
     console.log('[REMOTE] de', state.senderRole,
       '| action:', state.lastAction,
@@ -956,39 +999,38 @@ export class GameComponent implements OnInit, OnDestroy {
     try {
       // ── HOST recibe intención del guest → procesa y publica ─────────────
       if (this.onlineRol === 'host' && state.guestIntent) {
-        // Liberar flag antes de procesar (procesarIntencionGuest llama publicarEstadoCompleto)
         this.isApplyingRemoteState = false;
+        this.onlineSyncStatus = 'idle';
         this.procesarIntencionGuest(state.guestIntent);
         return;
       }
 
       // ── GUEST recibe estado completo del host → aplica snapshot ─────────
       if (this.onlineRol === 'guest' && state.senderRole === 'host') {
-        // Ignorar mensajes de mazo inicial (ya se aplican por polling)
-        if (state.lastAction === '__initial_deck__') return;
+        if (state.lastAction === '__initial_deck__') {
+          this.isApplyingRemoteState = false;
+          this.onlineSyncStatus = 'idle';
+          return;
+        }
 
-        // Efectos visuales de daño
         const dmgPlayer = state.playerLife < this.playerLife ? this.playerLife - state.playerLife : 0;
         const dmgCpu    = state.cpuLife    < this.cpuLife    ? this.cpuLife    - state.cpuLife    : 0;
 
         this.aplicarSnapshotCompleto(state);
 
-        // Animaciones
         if (dmgPlayer > 0) this.triggerDamageEffect(dmgPlayer, 'player');
         if (dmgCpu    > 0) this.triggerDamageEffect(dmgCpu,    'cpu');
 
-        if (state.lastAction &&
-            !state.lastAction.startsWith('__')) {
+        if (state.lastAction && !state.lastAction.startsWith('__')) {
           this.agregarLog(`🌐 [Host] ${state.lastAction}`);
         }
 
-        // Cambio de turno
         this.soundService.play('turnChange');
         this.triggerTurnChangeAnim();
-        console.log('[SYNC] guest aplicó estado del host | turno:', this.turno,
+
+        console.log('[ONLINE TURN] guest aplicó estado | turno:', this.turno,
           '| esMiTurno:', this.esMiTurnoOnline());
 
-        // Fin de partida
         if (state.gameOver && !this.gameOver) {
           const miUsername = this.authService.getUsername();
           const ganamos    = state.ganador !== '' && state.ganador !== miUsername;
@@ -999,7 +1041,10 @@ export class GameComponent implements OnInit, OnDestroy {
         }
       }
     } finally {
-      setTimeout(() => { this.isApplyingRemoteState = false; }, 150);
+      // Liberar flag inmediatamente — no con setTimeout para evitar deadlocks
+      this.isApplyingRemoteState = false;
+      this.onlineSyncStatus = 'idle';
+      clearTimeout(this.antiFreezeTimer);
     }
   }
 

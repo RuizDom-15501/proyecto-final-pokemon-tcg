@@ -416,6 +416,9 @@
   @if (isOnline && roomCode) {
     <div class="online-badge">
       🌐 ONLINE · Sala {{ roomCode }}
+      <span class="online-turn-label" [class.my-turn]="esMiTurnoOnline()" [class.waiting]="!esMiTurnoOnline()">
+        {{ onlineTurnLabel }}
+      </span>
     </div>
   }
 
