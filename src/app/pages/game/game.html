@@ -2,6 +2,13 @@
 
   <!-- ══ TABLERO ══ -->
   @if (!gameOver) {
+    <!-- Mensaje de reconexión -->
+    @if (isOnline && onlineSyncStatus === 'reconnecting') {
+      <div class="reconnecting-banner">
+        <span class="reconnecting-spin"></span>
+        Reconectando a la partida...
+      </div>
+    }
     <div class="board">
 
       <!-- HUD CPU -->
@@ -48,16 +55,32 @@
       </div>
 
       <!-- Banner de turno -->
-      <div class="turn-banner" [class.player-turn]="turno === 'jugador'" [class.cpu-turn]="turno === 'cpu'">
+      <div class="turn-banner"
+           [class.player-turn]="turno === 'jugador'"
+           [class.cpu-turn]="turno === 'cpu'"
+           [class.online-syncing]="isOnline && onlineSyncStatus === 'syncing'">
         <div class="turn-inner">
-          <span class="turn-icon">{{ turno === 'jugador' ? '⚔️' : '🤖' }}</span>
-          <span class="turn-text">{{ turno === 'jugador' ? 'TU TURNO' : 'CPU ATACANDO...' }}</span>
+          @if (isOnline) {
+            <!-- Online: mostrar quién actúa -->
+            <span class="turn-icon">{{ esMiTurnoOnline() ? '⚔️' : '⏳' }}</span>
+            <span class="turn-text">{{ esMiTurnoOnline() ? 'TU TURNO' : 'TURNO DEL RIVAL' }}</span>
+          } @else {
+            <span class="turn-icon">{{ turno === 'jugador' ? '⚔️' : '🤖' }}</span>
+            <span class="turn-text">{{ turno === 'jugador' ? 'TU TURNO' : 'CPU ATACANDO...' }}</span>
+          }
           <span class="turn-round">Ronda {{ roundNumber }}</span>
         </div>
-        @if (cpuThinking) {
+        @if (isOnline && onlineSyncStatus === 'syncing') {
           <div class="cpu-thinking">
             <span class="dot"></span><span class="dot"></span><span class="dot"></span>
           </div>
+        } @else if (cpuThinking) {
+          <div class="cpu-thinking">
+            <span class="dot"></span><span class="dot"></span><span class="dot"></span>
+          </div>
+        }
+        @if (isOnline && !esMiTurnoOnline() && onlineSyncStatus === 'idle') {
+          <span class="waiting-rival">Esperando movimiento...</span>
         }
       </div>
 

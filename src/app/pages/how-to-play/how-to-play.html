@@ -1,0 +1,74 @@
+<div class="htp-wrapper">
+  <div class="htp-orb htp-orb-1"></div>
+  <div class="htp-orb htp-orb-2"></div>
+
+  <div class="htp-content">
+
+    <button class="back-btn" (click)="goHome()">← Volver al Menú</button>
+
+    <div class="htp-header">
+      <div class="htp-icon">📖</div>
+      <h1 class="htp-title">Cómo Jugar</h1>
+      <p class="htp-sub">Pokémon Tactical Card Game · Generación IX</p>
+    </div>
+
+    <!-- Reglas básicas -->
+    <section class="htp-section">
+      <h2 class="section-title">⚔️ Reglas del Juego</h2>
+      <div class="rules-grid">
+        @for (rule of rules; track rule.title) {
+          <div class="rule-card">
+            <div class="rule-icon">{{ rule.icon }}</div>
+            <div class="rule-body">
+              <h3 class="rule-title">{{ rule.title }}</h3>
+              <p class="rule-desc">{{ rule.desc }}</p>
+            </div>
+          </div>
+        }
+      </div>
+    </section>
+
+    <!-- Tipos de acción -->
+    <section class="htp-section">
+      <h2 class="section-title">🎮 Acciones en tu Turno</h2>
+      <div class="actions-row">
+        <div class="action-card action-attack">
+          <div class="action-icon">💥</div>
+          <h3>Atacar</h3>
+          <p>Daño = Ataque − Defensa rival<br><small>(mínimo 80 de daño)</small></p>
+        </div>
+        <div class="action-card action-ability">
+          <div class="action-icon">✨</div>
+          <h3>Habilidad</h3>
+          <p>Efecto único por Pokémon.<br><small>Puede curar, paralizar o potenciar.</small></p>
+        </div>
+        <div class="action-card action-switch">
+          <div class="action-icon">🔄</div>
+          <h3>Cambiar</h3>
+          <p>Pon otro Pokémon en campo.<br><small>Consume el turno.</small></p>
+        </div>
+      </div>
+    </section>
+
+    <!-- Reglas online -->
+    <section class="htp-section">
+      <h2 class="section-title">🌐 Modo Online</h2>
+      <div class="rules-grid">
+        @for (rule of onlineRules; track rule.title) {
+          <div class="rule-card rule-card-online">
+            <div class="rule-icon">{{ rule.icon }}</div>
+            <div class="rule-body">
+              <h3 class="rule-title">{{ rule.title }}</h3>
+              <p class="rule-desc">{{ rule.desc }}</p>
+            </div>
+          </div>
+        }
+      </div>
+    </section>
+
+    <div class="htp-footer">
+      <button class="play-btn" (click)="goHome()">🎮 ¡A Jugar!</button>
+    </div>
+
+  </div>
+</div>

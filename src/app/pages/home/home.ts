@@ -23,10 +23,12 @@ export class HomeComponent {
     private router: Router
   ) {}
 
-  playSolo()   { this.router.navigate(['/game']);   }
-  playOnline() { this.router.navigate(['/online']); }
-  goToDeck()   { this.router.navigate(['/deck']);   }
-  goToLogin()  { this.router.navigate(['/login']);  }
+  playSolo()       { this.router.navigate(['/game']);        }
+  playOnline()     { this.router.navigate(['/online']);      }
+  goToDeck()       { this.router.navigate(['/deck']);        }
+  goToLogin()      { this.router.navigate(['/login']);       }
+  goToHowToPlay()  { this.router.navigate(['/how-to-play']); }
+  goToPokedex()    { this.router.navigate(['/pokedex']);     }
 
   async logout() {
     await this.authService.signOut();

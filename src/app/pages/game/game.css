@@ -978,3 +978,53 @@
 .online-turn-label.waiting {
   color: #a8b2d8;
 }
+
+/* ── Banner de reconexión online ── */
+.reconnecting-banner {
+  position: fixed;
+  top: 0; left: 0; right: 0;
+  z-index: 1300;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  padding: 10px 20px;
+  background: rgba(15, 23, 42, 0.92);
+  border-bottom: 1px solid rgba(201,162,39,0.3);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  color: #c9a227;
+  font-size: 0.88rem;
+  font-weight: 700;
+  letter-spacing: 1px;
+}
+
+.reconnecting-spin {
+  display: inline-block;
+  width: 14px; height: 14px;
+  border: 2px solid rgba(201,162,39,0.3);
+  border-top-color: #c9a227;
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+  flex-shrink: 0;
+}
+
+/* ── Turn-banner: estado online-syncing ── */
+.turn-banner.online-syncing {
+  border-color: rgba(201,162,39,0.4);
+  background: linear-gradient(90deg, rgba(201,162,39,0.08), rgba(201,162,39,0.04));
+}
+
+/* ── Texto "Esperando movimiento..." en turn-banner ── */
+.waiting-rival {
+  font-size: 0.7rem;
+  color: #7a8aaa;
+  letter-spacing: 1px;
+  font-style: italic;
+  animation: waitingPulse 2s ease-in-out infinite;
+}
+
+@keyframes waitingPulse {
+  0%, 100% { opacity: 0.5; }
+  50%       { opacity: 1; }
+}

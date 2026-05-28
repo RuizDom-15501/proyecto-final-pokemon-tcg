@@ -1,0 +1,97 @@
+<div class="pdx-wrapper">
+  <div class="pdx-orb pdx-orb-1"></div>
+  <div class="pdx-orb pdx-orb-2"></div>
+
+  <div class="pdx-content">
+
+    <button class="back-btn" (click)="goHome()">← Volver al Menú</button>
+
+    <div class="pdx-header">
+      <div class="pdx-icon">📋</div>
+      <h1 class="pdx-title">Pokémon Disponibles</h1>
+      <p class="pdx-sub">30 Pokémon · Generación IX · Paldea</p>
+    </div>
+
+    <!-- Controles de búsqueda y filtro -->
+    <div class="pdx-controls">
+      <div class="search-wrap">
+        <span class="search-icon">🔍</span>
+        <input
+          type="text"
+          class="search-input"
+          placeholder="Buscar Pokémon..."
+          [value]="busqueda()"
+          (input)="onBusqueda($any($event.target).value)"
+        />
+      </div>
+
+      <div class="tipo-filters">
+        @for (tipo of tipos; track tipo) {
+          <button
+            class="tipo-chip"
+            [class.active]="filtroTipo() === tipo"
+            [style.--chip-color]="tipo === 'TODOS' ? '#c9a227' : getTypeColor(tipo)"
+            (click)="onFiltroTipo(tipo)">
+            {{ tipo }}
+          </button>
+        }
+      </div>
+    </div>
+
+    <!-- Contador -->
+    <p class="pdx-count">{{ filtrados().length }} Pokémon encontrados</p>
+
+    <!-- Grid de cartas -->
+    <div class="pdx-grid">
+      @for (p of filtrados(); track p.id) {
+        <div class="pdx-card">
+          <div class="pdx-card-top" [style.background]="'linear-gradient(135deg, ' + getTypeColor(p.tipo) + '22, ' + getTypeColor(p.tipo) + '08)'">
+            <img [src]="getSprite(p.id)" [alt]="p.nombre" class="pdx-sprite" loading="lazy" />
+            <span class="pdx-id">#{{ p.id }}</span>
+          </div>
+          <div class="pdx-card-body">
+            <h3 class="pdx-name">{{ p.nombre }}</h3>
+            <span class="pdx-type-chip" [style.background]="getTypeColor(p.tipo)">{{ p.tipo }}</span>
+
+            <div class="pdx-stats">
+              <div class="stat-row">
+                <span class="stat-label">HP</span>
+                <div class="stat-bar-wrap">
+                  <div class="stat-bar" [style.width.%]="(p.hp / 800) * 100" style="background:#2ed573"></div>
+                </div>
+                <span class="stat-val">{{ p.hp }}</span>
+              </div>
+              <div class="stat-row">
+                <span class="stat-label">ATK</span>
+                <div class="stat-bar-wrap">
+                  <div class="stat-bar" [style.width.%]="(p.ataque / 400) * 100" style="background:#ff6b35"></div>
+                </div>
+                <span class="stat-val">{{ p.ataque }}</span>
+              </div>
+              <div class="stat-row">
+                <span class="stat-label">DEF</span>
+                <div class="stat-bar-wrap">
+                  <div class="stat-bar" [style.width.%]="(p.defensa / 300) * 100" style="background:#4fc3f7"></div>
+                </div>
+                <span class="stat-val">{{ p.defensa }}</span>
+              </div>
+            </div>
+
+            <div class="pdx-ability">
+              <span class="ability-label">✨ Habilidad</span>
+              <span class="ability-name">{{ p.habilidad }}</span>
+            </div>
+          </div>
+        </div>
+      }
+    </div>
+
+    @if (filtrados().length === 0) {
+      <div class="pdx-empty">
+        <span>😔</span>
+        <p>No se encontraron Pokémon con ese filtro.</p>
+      </div>
+    }
+
+  </div>
+</div>

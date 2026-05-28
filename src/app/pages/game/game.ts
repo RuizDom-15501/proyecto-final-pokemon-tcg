@@ -150,7 +150,7 @@ export class GameComponent implements OnInit, OnDestroy {
     let rol       = params.get('rol') as 'host' | 'guest' | null;
     let code      = params.get('code') ?? '';
 
-    // ── Bug 3: Reconexión desde localStorage si no hay queryParams ────────
+    // ── Reconexión desde localStorage si no hay queryParams ────────────
     if (!roomId) {
       const session = this.onlineRoom.loadSession();
       if (session) {
@@ -158,6 +158,11 @@ export class GameComponent implements OnInit, OnDestroy {
         roomId = session.roomId;
         rol    = session.onlineRol;
         code   = session.roomCode;
+        // Mostrar mensaje de reconexión hasta que llegue el primer estado
+        this.onlineSyncStatus = 'reconnecting';
+        setTimeout(() => {
+          if (this.onlineSyncStatus === 'reconnecting') this.onlineSyncStatus = 'idle';
+        }, 5000);
       }
     }
 
