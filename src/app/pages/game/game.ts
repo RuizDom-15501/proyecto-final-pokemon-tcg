@@ -9,7 +9,7 @@ import { StatsService } from '../../services/stats.service';
 import { AuthService } from '../../services/auth.service';
 import { SoundService } from '../../services/sound.service';
 import { AnimationService } from '../../services/animation.service';
-import { OnlineRoomService, GameState, CardSnapshot, OnlineSession, GuestIntent } from '../../services/online-room.service';
+import { OnlineRoomService, GameState, CardSnapshot, GuestIntent } from '../../services/online-room.service';
 import { GameRecord, DeckEntry } from '../../models/game-records';
 
 @Component({
@@ -99,10 +99,16 @@ export class GameComponent implements OnInit, OnDestroy {
   private lastRemoteTimestamp   = 0;
   private publishTimer:         any = null;
   private antiFreezeTimer:      any = null;  // anti-deadlock watchdog
+  private mazoHostPollTimer:    ReturnType<typeof setInterval> | null = null;  // polling mazo inicial (guest)
   roomCode = '';
+
+  // ── UX: anti-spam de acciones ──
+  protected accionEnCurso = false;
 
   // ── HUD online — estado visible para el jugador ──
   onlineSyncStatus: 'idle' | 'syncing' | 'waiting' | 'reconnecting' = 'idle';
+  // Mensaje de estado de sala (rival desconectado, sala cerrada, etc.)
+  onlineStatusMsg = '';
 
   get isOnline(): boolean { return !!this.roomId; }
 
@@ -154,15 +160,40 @@ export class GameComponent implements OnInit, OnDestroy {
     if (!roomId) {
       const session = this.onlineRoom.loadSession();
       if (session) {
-        console.log('[ONLINE] reconectando desde localStorage:', session.roomId);
-        roomId = session.roomId;
-        rol    = session.onlineRol;
-        code   = session.roomCode;
-        // Mostrar mensaje de reconexión hasta que llegue el primer estado
+        console.log('[RECONNECT] sesión guardada encontrada:', session.roomId);
+        // Verificar si la sala todavía existe antes de reconectar
         this.onlineSyncStatus = 'reconnecting';
-        setTimeout(() => {
-          if (this.onlineSyncStatus === 'reconnecting') this.onlineSyncStatus = 'idle';
-        }, 5000);
+        this.onlineRoom.getRoomById(session.roomId).then(({ data }) => {
+          if (data) {
+            console.log('[RECONNECT] sala existe — reconectando');
+            this.roomId    = session.roomId;
+            this.onlineRol = session.onlineRol;
+            this.roomCode  = session.roomCode;
+            this.onlineRoom.saveSession(session);
+            this.agregarLog(`🌐 Reconectado a sala: ${session.roomCode || session.roomId.slice(0,6).toUpperCase()}`);
+            this.onlineRoom.subscribeToRoom(this.roomId!, (state: GameState) => {
+              this.aplicarEstadoRemoto(state);
+            });
+            if (this.onlineRol === 'guest') {
+              this.cargarMazoDesdeHost();
+            }
+            setTimeout(() => {
+              if (this.onlineSyncStatus === 'reconnecting') this.onlineSyncStatus = 'idle';
+            }, 5000);
+          } else {
+            console.warn('[RECONNECT] sala no existe — limpiando sesión local');
+            this.onlineRoom.clearSession();
+            this.onlineSyncStatus = 'idle';
+            this.agregarLog('⚠️ La sala anterior ya no existe. Jugando en modo local.');
+          }
+        }).catch(() => {
+          console.error('[ONLINE ERROR] error al verificar sala en reconexión');
+          this.onlineRoom.clearSession();
+          this.onlineSyncStatus = 'idle';
+        });
+        // Retornar aquí — la reconexión es async, el resto del init continúa sin roomId
+        this.iniciarPartida();
+        return;
       }
     }
 
@@ -204,11 +235,19 @@ export class GameComponent implements OnInit, OnDestroy {
     clearTimeout(this.turnAnimTimer);
     clearTimeout(this.publishTimer);
     clearTimeout(this.antiFreezeTimer);
+    if (this.mazoHostPollTimer !== null) {
+      clearInterval(this.mazoHostPollTimer);
+      this.mazoHostPollTimer = null;
+    }
     this.limpiarOnline();
   }
 
   /** Limpia recursos online al salir o reiniciar */
   private limpiarOnline(): void {
+    if (this.mazoHostPollTimer !== null) {
+      clearInterval(this.mazoHostPollTimer);
+      this.mazoHostPollTimer = null;
+    }
     if (this.roomId) {
       this.onlineRoom.unsubscribe();
       this.onlineRoom.clearSession();
@@ -397,6 +436,7 @@ export class GameComponent implements OnInit, OnDestroy {
 
   seleccionarCarta(carta: PokemonCard) {
     if (!this.puedeActuarJugador()) return;
+    if (this.accionEnCurso) return;  // guard anti-spam
     this.soundService.play('click');
     this.cartaSeleccionada = carta;
     this.mostrarMenuAcciones = true;
@@ -412,6 +452,8 @@ export class GameComponent implements OnInit, OnDestroy {
 
   ejecutarAtaque() {
     if (!this.cartaSeleccionada) return;
+    if (this.accionEnCurso) return;  // guard anti-spam
+    this.accionEnCurso = true;
     this.soundService.play('attack');
     // Guardar referencia ANTES de cerrarAcciones (que la pone a null)
     const carta  = this.cartaSeleccionada;
@@ -422,6 +464,7 @@ export class GameComponent implements OnInit, OnDestroy {
     if (this.isOnline && this.onlineRol === 'guest') {
       console.log('[ONLINE ACTION] guest → intent attack:', nombre);
       this.enviarIntencionGuest({ type: 'attack', cardId });
+      this.accionEnCurso = false;
     } else {
       console.log('[ONLINE ACTION] host/local ejecutarAtaque →', nombre);
       this.realizarAtaque(carta, 'jugador');
@@ -431,11 +474,14 @@ export class GameComponent implements OnInit, OnDestroy {
       } else {
         if (!this.gameOver) this.pasarTurnoCPU();
       }
+      this.accionEnCurso = false;
     }
   }
 
   ejecutarHabilidad() {
     if (!this.cartaSeleccionada) return;
+    if (this.accionEnCurso) return;  // guard anti-spam
+    this.accionEnCurso = true;
     this.soundService.play('ability');
     // Guardar referencia ANTES de cerrarAcciones
     const carta  = this.cartaSeleccionada;
@@ -446,6 +492,7 @@ export class GameComponent implements OnInit, OnDestroy {
     if (this.isOnline && this.onlineRol === 'guest') {
       console.log('[ONLINE ACTION] guest → intent ability:', nombre);
       this.enviarIntencionGuest({ type: 'ability', cardId });
+      this.accionEnCurso = false;
     } else {
       console.log('[ONLINE ACTION] host/local ejecutarHabilidad →', nombre);
       this.realizarHabilidad(carta, 'jugador');
@@ -455,18 +502,22 @@ export class GameComponent implements OnInit, OnDestroy {
       } else {
         if (!this.gameOver) this.pasarTurnoCPU();
       }
+      this.accionEnCurso = false;
     }
   }
 
   /** Cambiar Pokémon activo desde la reserva */
   cambiarActiva(carta: PokemonCard) {
     if (!this.puedeActuarJugador()) return;
+    if (this.accionEnCurso) return;  // guard anti-spam
+    this.accionEnCurso = true;
     this.soundService.play('click');
 
     if (this.isOnline && this.onlineRol === 'guest') {
       // ── GUEST: solo envía intención ─────────────────────────────────────
       console.log('[ONLINE ACTION] guest → intent switch:', carta.nombre);
       this.enviarIntencionGuest({ type: 'switch', cardId: carta.id });
+      this.accionEnCurso = false;
     } else {
       // ── HOST / LOCAL ─────────────────────────────────────────────────────
       const anterior = this.playerActive;
@@ -484,6 +535,7 @@ export class GameComponent implements OnInit, OnDestroy {
       } else {
         this.pasarTurnoCPU();
       }
+      this.accionEnCurso = false;
     }
   }
 
@@ -521,6 +573,7 @@ export class GameComponent implements OnInit, OnDestroy {
   /** Host: procesó acción del guest → turno del host */
   private pasarTurnoOnlineAlHost(): void {
     this.turno = 'jugador';
+    this.accionEnCurso = false;  // liberar guard al recibir turno
     this.soundService.play('turnChange');
     this.triggerTurnChangeAnim();
     this.agregarLog(`— Turno del Host`);
@@ -555,6 +608,7 @@ export class GameComponent implements OnInit, OnDestroy {
     // Devolver turno al jugador
     this.turno = 'jugador';
     this.cpuThinking = false;
+    this.accionEnCurso = false;
     this.roundNumber++;
     this.soundService.play('turnChange');
     this.triggerTurnChangeAnim();
@@ -653,35 +707,27 @@ export class GameComponent implements OnInit, OnDestroy {
   private procesarKO(derrotado: PokemonCard, lado: 'player' | 'cpu') {
     this.mostrarKO(derrotado.nombre);
     this.agregarLog(`💀 ¡${derrotado.nombre} fue derrotado!`);
-    console.log('[KO]', derrotado.nombre, '| lado:', lado,
-      '| bench cpu:', this.cpuBench.length, '| bench player:', this.playerBench.length);
+    console.log('[KO]', derrotado.nombre, '| lado:', lado);
 
     if (lado === 'cpu') {
-      // Reemplazo SÍNCRONO — sin setTimeout para evitar estado null durante publish
       if (this.cpuBench.length > 0) {
         this.cpuActive = this.cpuBench.shift()!;
         this.agregarLog(`🔄 CPU envía a ${this.cpuActive.nombre}.`);
-        console.log('[KO] cpu reemplazada por:', this.cpuActive.nombre);
       } else {
         this.cpuActive = null;
         this.agregarLog('⚠️ CPU sin reserva. Ataques van a vida global.');
-        console.log('[KO] cpu sin reserva — cpuActive = null');
+        console.log('[KO] cpu sin reserva');
       }
     } else {
-      // Reemplazo SÍNCRONO
       if (this.playerBench.length > 0) {
         this.playerActive = this.playerBench.shift()!;
         this.agregarLog(`🔄 ${this.playerActive.nombre} entra al campo.`);
-        console.log('[KO] player reemplazado por:', this.playerActive.nombre);
       } else {
         this.playerActive = null;
         this.agregarLog('⚠️ Sin reserva. Ataques van a tu vida global.');
-        console.log('[KO] player sin reserva — playerActive = null');
+        console.log('[KO] player sin reserva');
       }
     }
-
-    console.log('[ACTIVE STATE] tras KO | playerActive:', this.playerActive?.nombre ?? 'null',
-      '| cpuActive:', this.cpuActive?.nombre ?? 'null');
   }
 
   estaBloqueada(carta: PokemonCard | null | undefined): boolean {
@@ -724,6 +770,7 @@ export class GameComponent implements OnInit, OnDestroy {
   }
 
   terminarJuego(resultado: 'victoria' | 'derrota' | 'empate', msg: string) {
+    if (this.gameOver) return;  // guard: evitar doble llamada
     this.gameOver  = true;
     this.resultado = resultado;
     this.mensaje   = msg;
@@ -881,40 +928,72 @@ export class GameComponent implements OnInit, OnDestroy {
     if (!this.roomId) return;
     console.log('[SYNC] guest esperando mazo inicial...');
 
+    // Limpiar poll anterior si existiera
+    if (this.mazoHostPollTimer !== null) {
+      clearInterval(this.mazoHostPollTimer);
+      this.mazoHostPollTimer = null;
+    }
+
     let intentos = 0;
-    const poll = setInterval(async () => {
+    this.mazoHostPollTimer = setInterval(async () => {
       intentos++;
+
+      // Verificar primero que la sala sigue existiendo
       const { data } = await this.onlineRoom.getRoomById(this.roomId!);
+
+      if (!data) {
+        // Sala no existe — limpiar y mostrar mensaje
+        clearInterval(this.mazoHostPollTimer!);
+        this.mazoHostPollTimer = null;
+        console.warn('[ROOM] sala no encontrada durante polling — limpiando sesión');
+        this.onlineRoom.clearSession();
+        this.onlineStatusMsg = '🔌 Sala cerrada por el host.';
+        this.mensaje  = '⚠️ La sala fue cerrada. Vuelve al menú para crear una nueva.';
+        this.gameOver = true;
+        this.resultado = 'derrota';
+        return;
+      }
+
       const gs = data?.game_state as GameState | null;
 
       if (gs?.initialDeck && gs.playerActive && gs.cpuActive) {
-        clearInterval(poll);
+        clearInterval(this.mazoHostPollTimer!);
+        this.mazoHostPollTimer = null;
         console.log('[SYNC] guest recibió mazo inicial');
         this.aplicarSnapshotCompleto(gs);
         this.agregarLog('🔄 Tablero sincronizado con el host.');
+        this.onlineSyncStatus = 'idle';
       } else if (intentos >= 30) {
-        clearInterval(poll);
+        clearInterval(this.mazoHostPollTimer!);
+        this.mazoHostPollTimer = null;
         console.warn('[SYNC] timeout esperando mazo — usando mazo local');
+        this.onlineSyncStatus = 'idle';
       }
     }, 1000);
   }
 
   // ── Reconstruir tablero desde snapshot del host ─────────────────────────
   private aplicarSnapshotCompleto(state: GameState): void {
+    // Guards defensivos: validar que el estado tiene datos mínimos
+    if (!state) { console.warn('[SYNC] aplicarSnapshotCompleto — state null, ignorando'); return; }
+    if (state.playerLife === undefined || state.cpuLife === undefined) {
+      console.warn('[SYNC] aplicarSnapshotCompleto — vida undefined, ignorando'); return;
+    }
+
     console.log('[SNAPSHOT] aplicando | playerActive:', state.playerActive?.nombre ?? 'null',
       '| cpuActive:', state.cpuActive?.nombre ?? 'null',
       '| playerBench:', state.playerBench?.length ?? 0,
       '| cpuBench:', state.cpuBench?.length ?? 0);
 
     this.playerActive = state.playerActive ? this.fromSnapshotExact(state.playerActive) : null;
-    this.playerBench  = (state.playerBench ?? []).map(s => this.fromSnapshotExact(s));
+    this.playerBench  = Array.isArray(state.playerBench) ? state.playerBench.map(s => this.fromSnapshotExact(s)) : [];
     this.cpuActive    = state.cpuActive    ? this.fromSnapshotExact(state.cpuActive)    : null;
-    this.cpuBench     = (state.cpuBench    ?? []).map(s => this.fromSnapshotExact(s));
+    this.cpuBench     = Array.isArray(state.cpuBench)    ? state.cpuBench.map(s => this.fromSnapshotExact(s))    : [];
 
-    this.playerLife  = state.playerLife;
-    this.cpuLife     = state.cpuLife;
-    this.roundNumber = state.roundNumber;
-    this.turno       = state.turno;
+    this.playerLife  = state.playerLife  ?? this.playerLife;
+    this.cpuLife     = state.cpuLife     ?? this.cpuLife;
+    this.roundNumber = state.roundNumber ?? this.roundNumber;
+    this.turno       = state.turno       ?? this.turno;
 
     console.log('[SNAPSHOT] aplicado | playerActive:', this.playerActive?.nombre ?? 'null',
       '| cpuActive:', this.cpuActive?.nombre ?? 'null',
@@ -924,9 +1003,7 @@ export class GameComponent implements OnInit, OnDestroy {
 
   // ── Host: procesa intención del guest y ejecuta la acción ───────────────
   private procesarIntencionGuest(intent: GuestIntent): void {
-    console.log('[SYNC] host procesando intent del guest:', intent.type, '| cardId:', intent.cardId);
-    console.log('[ACTIVE STATE] antes de intent | playerActive:', this.playerActive?.nombre ?? 'null',
-      '| cpuActive:', this.cpuActive?.nombre ?? 'null');
+    console.log('[SYNC] host procesando intent:', intent.type, '| cardId:', intent.cardId);
 
     if (intent.type === 'attack') {
       // El guest controla el lado cpu — buscar su carta activa
@@ -972,9 +1049,6 @@ export class GameComponent implements OnInit, OnDestroy {
 
     this.verificarGanador();
 
-    console.log('[ACTIVE STATE] tras intent | playerActive:', this.playerActive?.nombre ?? 'null',
-      '| cpuActive:', this.cpuActive?.nombre ?? 'null');
-
     this.pasarTurnoOnlineAlHost();
     this.publicarEstadoCompleto(`[Guest] ${intent.type}`);
   }
@@ -988,7 +1062,6 @@ export class GameComponent implements OnInit, OnDestroy {
 
     // Si el flag está activo, liberarlo antes de continuar (evita deadlock)
     if (this.isApplyingRemoteState) {
-      console.log('[DEADLOCK] aplicarEstadoRemoto — flag activo, forzando liberación');
       this.isApplyingRemoteState = false;
     }
 
@@ -1032,6 +1105,7 @@ export class GameComponent implements OnInit, OnDestroy {
 
         this.soundService.play('turnChange');
         this.triggerTurnChangeAnim();
+        this.accionEnCurso = false;  // liberar guard al recibir turno
 
         console.log('[ONLINE TURN] guest aplicó estado | turno:', this.turno,
           '| esMiTurno:', this.esMiTurnoOnline());
@@ -1039,12 +1113,18 @@ export class GameComponent implements OnInit, OnDestroy {
         if (state.gameOver && !this.gameOver) {
           const miUsername = this.authService.getUsername();
           const ganamos    = state.ganador !== '' && state.ganador !== miUsername;
+          // Detectar si fue desconexión (ganador vacío = rival salió)
+          const fueDesconexion = state.ganador === '' || state.ganador === '__disconnect__';
+          if (fueDesconexion) {
+            this.onlineStatusMsg = '🔌 Rival desconectado.';
+          }
           this.terminarJuego(
-            ganamos ? 'victoria' : 'derrota',
-            ganamos ? '🏆 ¡VICTORIA! Tu oponente fue derrotado.' : '💀 DERROTA — Tu oponente ganó.'
+            ganamos || fueDesconexion ? 'victoria' : 'derrota',
+            ganamos || fueDesconexion
+              ? '🏆 ¡VICTORIA! Tu oponente fue derrotado.'
+              : '💀 DERROTA — Tu oponente ganó.'
           );
-        }
-      }
+        }      }
     } finally {
       // Liberar flag inmediatamente — no con setTimeout para evitar deadlocks
       this.isApplyingRemoteState = false;
@@ -1197,14 +1277,8 @@ export class GameComponent implements OnInit, OnDestroy {
   puedeActuarJugador(): boolean {
     if (this.gameOver || this.cpuThinking) return false;
     if (this.isOnline) {
-      // En modo online: cada jugador actúa en su turno asignado
-      const puedo = this.esMiTurnoOnline();
-      console.log('[TURN] puedeActuarJugador →', puedo,
-        '| rol:', this.onlineRol,
-        '| turno:', this.turno);
-      return puedo;
+      return this.esMiTurnoOnline();
     }
-    // Modo local: solo actúa en turno 'jugador'
     return this.turno === 'jugador';
   }
 
@@ -1268,6 +1342,7 @@ export class GameComponent implements OnInit, OnDestroy {
   reiniciarJuego() {
     clearTimeout(this.cpuTimer);
     this.soundService.play('click');
+    this.accionEnCurso = false;
     this.limpiarOnline();
     this.iniciarPartida();
   }

@@ -29,6 +29,17 @@ export class PokedexComponent {
   busqueda = signal('');
   filtroTipo = signal('TODOS');
 
+  // ── Modal ──
+  cartaModal: PokedexEntry | null = null;
+
+  abrirModal(p: PokedexEntry): void {
+    this.cartaModal = p;
+  }
+
+  cerrarModal(): void {
+    this.cartaModal = null;
+  }
+
   readonly tipos = [
     'TODOS','GRASS','FIRE','WATER','ELECTRIC','NORMAL',
     'BUG','FAIRY','ROCK','PSYCHIC','FLYING','GHOST','DARK','DRAGON','ICE'

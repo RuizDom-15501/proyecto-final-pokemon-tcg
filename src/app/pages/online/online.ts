@@ -7,6 +7,10 @@ import { OnlineRoomService, OnlineRoom } from '../../services/online-room.servic
 
 type Vista = 'menu' | 'creando' | 'esperando' | 'uniendo' | 'jugando';
 
+// Tiempo máximo esperando rival (ms)
+const WAIT_TIMEOUT_MS = 300_000;
+const POLL_INTERVAL_MS = 2_000;
+
 @Component({
   selector: 'app-online',
   standalone: true,
@@ -24,6 +28,11 @@ export class OnlineComponent implements OnDestroy {
   // Para unirse a sala
   codigoInput = '';
 
+  // Timers internos — limpiados en ngOnDestroy
+  private pollInterval: ReturnType<typeof setInterval> | null = null;
+  private pollTimeout:  ReturnType<typeof setTimeout>  | null = null;
+  private navigated = false;
+
   constructor(
     public  authService: AuthService,
     private roomService: OnlineRoomService,
@@ -31,7 +40,13 @@ export class OnlineComponent implements OnDestroy {
   ) {}
 
   ngOnDestroy(): void {
+    this.limpiarTimers();
     this.roomService.unsubscribe();
+  }
+
+  private limpiarTimers(): void {
+    if (this.pollInterval !== null) { clearInterval(this.pollInterval); this.pollInterval = null; }
+    if (this.pollTimeout  !== null) { clearTimeout(this.pollTimeout);   this.pollTimeout  = null; }
   }
 
   // ── Crear sala ────────────────────────────────────────────────────────────
@@ -39,8 +54,10 @@ export class OnlineComponent implements OnDestroy {
     if (!this.authService.isAuthenticated()) {
       this.router.navigate(['/login']); return;
     }
+    if (this.loading()) return;  // guard anti-doble-click
     this.loading.set(true);
     this.error.set(null);
+    this.navigated = false;
 
     const hostId = this.authService.getUserId() ?? this.authService.getUsername();
     const { room, error } = await this.roomService.createRoom(hostId);
@@ -54,52 +71,66 @@ export class OnlineComponent implements OnDestroy {
     this.room.set(room);
     this.vista.set('esperando');
     this.loading.set(false);
+    console.log('[ROOM] sala creada:', room.id, '| código:', room.code);
 
-    // Escuchar cuando el guest se une
+    // Escuchar cuando el guest se une via Realtime
     this.roomService.subscribeToRoom(room.id, (state) => {
-      // Cuando el estado cambia a 'jugando', ir al juego
-      const r = this.room();
-      if (r && state.lastAction === '__guest_joined__') {
+      if (state.lastAction === '__guest_joined__' && !this.navigated) {
+        console.log('[ROOM] guest detectado via Realtime — navegando');
+        this.navigated = true;
+        this.limpiarTimers();
         this.irAlJuego(room.id, 'host');
       }
     });
 
-    // Polling simple: verificar si alguien se unió
+    // Polling como fallback
     this.pollForGuest(room.id);
   }
 
   // ── Unirse a sala ─────────────────────────────────────────────────────────
   async unirseASala(): Promise<void> {
-    if (!this.codigoInput.trim()) {
+    const codigo = this.codigoInput.trim();
+    if (!codigo) {
       this.error.set('Ingresa un código de sala.'); return;
+    }
+    if (codigo.length < 4) {
+      this.error.set('El código debe tener al menos 4 caracteres.'); return;
     }
     if (!this.authService.isAuthenticated()) {
       this.router.navigate(['/login']); return;
     }
+    if (this.loading()) return;  // guard anti-doble-click
     this.loading.set(true);
     this.error.set(null);
 
     const guestId = this.authService.getUserId() ?? this.authService.getUsername();
-    const { room, error } = await this.roomService.joinRoom(this.codigoInput.trim(), guestId);
+    const { room, error } = await this.roomService.joinRoom(codigo, guestId);
 
     if (error || !room) {
-      this.error.set('Sala no encontrada o ya está en uso.');
+      this.error.set('Sala no encontrada o ya está en uso. Verifica el código.');
       this.loading.set(false);
       return;
     }
 
     this.room.set(room);
     this.loading.set(false);
+    console.log('[ROOM] guest unido a sala:', room.id, '| código:', room.code);
 
     // Notificar al host que el guest se unió
     await this.roomService.pushState(room.id, {
       lastAction: '__guest_joined__',
-      gameOver: false,
-      ganador: '',
-      turno: 'jugador',
+      gameOver:   false,
+      ganador:    '',
+      turno:      'jugador',
       playerLife: 5000,
-      cpuLife: 5000,
-      roundNumber: 1
+      cpuLife:    5000,
+      roundNumber: 1,
+      playerBench: [],
+      cpuBench:    [],
+      playerActive: null,
+      cpuActive:   null,
+      timestamp:   Date.now(),
+      senderRole:  'guest'
     });
 
     this.irAlJuego(room.id, 'guest');
@@ -107,35 +138,59 @@ export class OnlineComponent implements OnDestroy {
 
   // ── Ir al juego pasando roomId y rol por queryParams ──────────────────────
   private irAlJuego(roomId: string, rol: 'host' | 'guest'): void {
+    this.limpiarTimers();
     this.roomService.unsubscribe();
     const code = this.room()?.code ?? '';
+    console.log('[ROOM] navegando a /game | roomId:', roomId, '| rol:', rol, '| code:', code);
     this.router.navigate(['/game'], { queryParams: { roomId, rol, code } });
   }
 
-  // ── Polling simple para detectar guest (fallback al Realtime) ────────────
+  // ── Polling fallback para detectar guest ─────────────────────────────────
   private pollForGuest(roomId: string): void {
-    let navigated = false;
-    const interval = setInterval(async () => {
+    this.limpiarTimers();
+
+    this.pollInterval = setInterval(async () => {
+      if (this.navigated) { this.limpiarTimers(); return; }
       const { data } = await this.roomService.getRoomById(roomId);
-      if (data?.guest_id && data?.status === 'playing' && !navigated) {
-        navigated = true;
-        clearInterval(interval);
+      if (data?.guest_id && data?.status === 'playing' && !this.navigated) {
+        console.log('[ROOM] guest detectado via polling — navegando');
+        this.navigated = true;
+        this.limpiarTimers();
         this.irAlJuego(roomId, 'host');
       }
-    }, 2000);
-    // Limpiar después de 5 minutos si nadie se une
-    setTimeout(() => clearInterval(interval), 300_000);
+    }, POLL_INTERVAL_MS);
+
+    // Timeout: sala expira si nadie se une
+    this.pollTimeout = setTimeout(() => {
+      if (!this.navigated) {
+        this.limpiarTimers();
+        this.roomService.unsubscribe();
+        this.error.set('Tiempo de espera agotado. Nadie se unió a la sala.');
+        this.vista.set('menu');
+        this.room.set(null);
+        console.warn('[ROOM] timeout esperando guest — sala cancelada');
+      }
+    }, WAIT_TIMEOUT_MS);
   }
 
   cancelar(): void {
+    this.limpiarTimers();
     this.roomService.unsubscribe();
+    // Cerrar sala si existe
+    const r = this.room();
+    if (r?.id) {
+      this.roomService.closeRoom(r.id).catch(() => {});
+    }
     this.room.set(null);
     this.error.set(null);
     this.codigoInput = '';
+    this.navigated = false;
     this.vista.set('menu');
+    console.log('[ROOM] sala cancelada por el host');
   }
 
   goHome(): void {
+    this.limpiarTimers();
     this.router.navigate(['/']);
   }
 }

@@ -44,7 +44,7 @@
     <!-- Grid de cartas -->
     <div class="pdx-grid">
       @for (p of filtrados(); track p.id) {
-        <div class="pdx-card">
+        <div class="pdx-card" (click)="abrirModal(p)" role="button" tabindex="0" (keydown.enter)="abrirModal(p)" [attr.aria-label]="'Ver detalles de ' + p.nombre">
           <div class="pdx-card-top" [style.background]="'linear-gradient(135deg, ' + getTypeColor(p.tipo) + '22, ' + getTypeColor(p.tipo) + '08)'">
             <img [src]="getSprite(p.id)" [alt]="p.nombre" class="pdx-sprite" loading="lazy" />
             <span class="pdx-id">#{{ p.id }}</span>
@@ -95,3 +95,52 @@
 
   </div>
 </div>
+
+<!-- ══ MODAL DETALLE ══ -->
+@if (cartaModal) {
+  <div class="pdx-modal-overlay" (click)="cerrarModal()" role="dialog" aria-modal="true" [attr.aria-label]="'Detalle de ' + cartaModal.nombre">
+    <div class="pdx-modal" (click)="$event.stopPropagation()">
+      <button class="pdx-modal-close" (click)="cerrarModal()" aria-label="Cerrar">✕</button>
+
+      <div class="pdx-modal-top" [style.background]="'linear-gradient(135deg, ' + getTypeColor(cartaModal.tipo) + '33, ' + getTypeColor(cartaModal.tipo) + '0a)'">
+        <img [src]="getSprite(cartaModal.id)" [alt]="cartaModal.nombre" class="pdx-modal-img" />
+        <span class="pdx-modal-id">#{{ cartaModal.id }}</span>
+      </div>
+
+      <div class="pdx-modal-body">
+        <h2 class="pdx-modal-name">{{ cartaModal.nombre }}</h2>
+        <span class="pdx-type-chip pdx-modal-type" [style.background]="getTypeColor(cartaModal.tipo)">{{ cartaModal.tipo }}</span>
+
+        <div class="pdx-modal-stats">
+          <div class="pdx-modal-stat-row">
+            <span class="pdx-modal-stat-label">❤️ HP</span>
+            <div class="pdx-modal-bar-wrap">
+              <div class="pdx-modal-bar" [style.width.%]="(cartaModal.hp / 800) * 100" style="background:#2ed573"></div>
+            </div>
+            <span class="pdx-modal-stat-val">{{ cartaModal.hp }}</span>
+          </div>
+          <div class="pdx-modal-stat-row">
+            <span class="pdx-modal-stat-label">⚔️ ATK</span>
+            <div class="pdx-modal-bar-wrap">
+              <div class="pdx-modal-bar" [style.width.%]="(cartaModal.ataque / 400) * 100" style="background:#ff6b35"></div>
+            </div>
+            <span class="pdx-modal-stat-val">{{ cartaModal.ataque }}</span>
+          </div>
+          <div class="pdx-modal-stat-row">
+            <span class="pdx-modal-stat-label">🛡️ DEF</span>
+            <div class="pdx-modal-bar-wrap">
+              <div class="pdx-modal-bar" [style.width.%]="(cartaModal.defensa / 300) * 100" style="background:#4fc3f7"></div>
+            </div>
+            <span class="pdx-modal-stat-val">{{ cartaModal.defensa }}</span>
+          </div>
+        </div>
+
+        <div class="pdx-modal-ability">
+          <span class="pdx-modal-ability-label">✨ Habilidad</span>
+          <span class="pdx-modal-ability-name">{{ cartaModal.habilidad }}</span>
+          <span class="pdx-modal-ability-desc">Genera daño físico básico al oponente.</span>
+        </div>
+      </div>
+    </div>
+  </div>
+}

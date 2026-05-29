@@ -6,6 +6,7 @@
     <h1 class="online-title">Modo Online</h1>
 
     @if (!authService.isAuthenticated()) {
+      <!-- ── NO AUTENTICADO ── -->
       <p class="online-sub">Inicia sesión para jugar online</p>
       <button class="action-btn btn-login" (click)="goHome()">🔐 Ir al Login</button>
 
@@ -14,11 +15,14 @@
       <p class="online-sub">Bienvenido, <strong>{{ authService.getUsername() }}</strong></p>
 
       @if (error()) {
-        <div class="online-error">⚠️ {{ error() }}</div>
+        <div class="online-error" role="alert">⚠️ {{ error() }}</div>
       }
 
       <div class="room-actions">
-        <button class="action-btn btn-create" (click)="crearSala()" [disabled]="loading()">
+        <button class="action-btn btn-create"
+                (click)="crearSala()"
+                [disabled]="loading()"
+                aria-label="Crear nueva sala">
           @if (loading()) { <span class="mini-spin"></span> } @else { 🏠 }
           Crear Sala
         </button>
@@ -32,23 +36,39 @@
             placeholder="Código de sala (ej: AB12CD)"
             class="code-input"
             maxlength="6"
+            autocomplete="off"
+            spellcheck="false"
             (keyup.enter)="unirseASala()"
+            aria-label="Código de sala"
           />
-          <button class="action-btn btn-join" (click)="unirseASala()" [disabled]="loading()">
+          <button class="action-btn btn-join"
+                  (click)="unirseASala()"
+                  [disabled]="loading()"
+                  aria-label="Unirse a sala">
             @if (loading()) { <span class="mini-spin"></span> } @else { 🚪 }
             Unirse
           </button>
         </div>
       </div>
 
+      <div class="online-hints">
+        <span class="hint-item">🏠 Crea una sala y comparte el código</span>
+        <span class="hint-item">🚪 Ingresa el código para unirte</span>
+        <span class="hint-item">⚔️ El host actúa primero</span>
+      </div>
+
     } @else if (vista() === 'esperando') {
       <!-- ── ESPERANDO OPONENTE ── -->
       <div class="waiting-box">
         <div class="search-spinner"></div>
-        <p class="waiting-title">Esperando oponente...</p>
-        <p class="waiting-sub">Comparte este código:</p>
-        <div class="room-code">{{ room()?.code }}</div>
-        <p class="waiting-hint">El otro jugador debe ingresar este código</p>
+        <p class="waiting-title">Esperando rival...</p>
+        <p class="waiting-sub">Comparte este código con tu oponente:</p>
+        <div class="room-code" aria-label="Código de sala">{{ room()?.code }}</div>
+        <p class="waiting-hint">El rival debe ingresar este código en "Unirse"</p>
+        <div class="waiting-status">
+          <span class="status-dot"></span>
+          <span>Sala abierta · Buscando jugador</span>
+        </div>
         <button class="action-btn btn-cancel" (click)="cancelar()">✖ Cancelar</button>
       </div>
     }

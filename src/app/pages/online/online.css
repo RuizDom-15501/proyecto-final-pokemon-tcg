@@ -217,3 +217,56 @@
   border: 2px solid rgba(5,10,20,0.3); border-top-color: #050a14;
   border-radius: 50%; animation: spin 0.7s linear infinite;
 }
+
+/* ── Hints de uso ── */
+.online-hints {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  width: 100%;
+  padding: 12px 14px;
+  background: rgba(255,255,255,0.02);
+  border: 1px solid rgba(255,255,255,0.05);
+  border-radius: 10px;
+}
+
+.hint-item {
+  font-size: 0.78rem;
+  color: #3a4a6a;
+  letter-spacing: 0.5px;
+}
+
+/* ── Estado de sala abierta ── */
+.waiting-status {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.78rem;
+  color: #7a8aaa;
+  letter-spacing: 0.5px;
+}
+
+.status-dot {
+  display: inline-block;
+  width: 8px; height: 8px;
+  border-radius: 50%;
+  background: #2ed573;
+  box-shadow: 0 0 6px rgba(46,213,115,0.8);
+  animation: statusPulse 1.5s ease-in-out infinite;
+  flex-shrink: 0;
+}
+
+@keyframes statusPulse {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50%       { opacity: 0.5; transform: scale(0.8); }
+}
+
+/* ── Responsive ── */
+@media (max-width: 480px) {
+  .online-content { padding: 28px 16px; gap: 16px; }
+  .online-title   { font-size: 1.5rem; letter-spacing: 2px; }
+  .room-code      { font-size: 1.7rem; letter-spacing: 5px; padding: 8px 16px; }
+  .join-row       { flex-direction: column; }
+  .btn-join       { width: 100%; justify-content: center; }
+  .code-input     { width: 100%; }
+}

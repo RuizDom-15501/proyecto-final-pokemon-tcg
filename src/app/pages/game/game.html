@@ -1,10 +1,12 @@
-<div class="game-wrapper">
+<div class="game-wrapper"
+     [class.screen-flash]="screenFlash"
+     [style.--flash-color]="screenFlashColor">
 
   <!-- ══ TABLERO ══ -->
   @if (!gameOver) {
     <!-- Mensaje de reconexión -->
     @if (isOnline && onlineSyncStatus === 'reconnecting') {
-      <div class="reconnecting-banner">
+      <div class="reconnecting-banner" role="status" aria-live="polite">
         <span class="reconnecting-spin"></span>
         Reconectando a la partida...
       </div>
@@ -355,14 +357,18 @@
           <div class="ability-desc">{{ cartaSeleccionada.habilidad.descripcion }}</div>
         </div>
         <div class="modal-actions">
-          <button class="action-btn btn-attack" (click)="ejecutarAtaque()">
+          <button class="action-btn btn-attack"
+                  (click)="ejecutarAtaque()"
+                  [disabled]="accionEnCurso">
             <span class="action-btn-icon">💥</span>
             <span class="action-btn-text">
               <strong>Atacar</strong>
               <small>Ataque básico</small>
             </span>
           </button>
-          <button class="action-btn btn-ability" (click)="ejecutarHabilidad()">
+          <button class="action-btn btn-ability"
+                  (click)="ejecutarHabilidad()"
+                  [disabled]="accionEnCurso">
             <span class="action-btn-icon">✨</span>
             <span class="action-btn-text">
               <strong>Habilidad</strong>

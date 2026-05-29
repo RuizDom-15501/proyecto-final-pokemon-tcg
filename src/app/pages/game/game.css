@@ -1028,3 +1028,186 @@
   0%, 100% { opacity: 0.5; }
   50%       { opacity: 1; }
 }
+
+/* ══════════════════════════════════════════
+   PULIDO FINAL — QA / UX
+══════════════════════════════════════════ */
+
+/* ── Screen flash sobre el wrapper completo ── */
+.game-wrapper.screen-flash::after {
+  content: '';
+  position: fixed;
+  inset: 0;
+  background: var(--flash-color, rgba(255,255,255,0.15));
+  pointer-events: none;
+  z-index: 2000;
+  animation: wrapperFlash 0.3s ease forwards;
+}
+
+@keyframes wrapperFlash {
+  0%   { opacity: 1; }
+  100% { opacity: 0; }
+}
+
+/* ── Victoria: confetti shimmer en el endgame-box ── */
+.victory-box {
+  background: linear-gradient(
+    160deg,
+    #0d1a2e 0%,
+    #0f1e35 40%,
+    #0d1a2e 100%
+  );
+  position: relative;
+  overflow: hidden;
+}
+
+.victory-box::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    135deg,
+    transparent 30%,
+    rgba(201,162,39,0.06) 50%,
+    transparent 70%
+  );
+  background-size: 200% 200%;
+  animation: victoryShimmer 3s ease-in-out infinite;
+  pointer-events: none;
+}
+
+@keyframes victoryShimmer {
+  0%   { background-position: 200% 200%; }
+  50%  { background-position: 0% 0%; }
+  100% { background-position: 200% 200%; }
+}
+
+/* ── Derrota: vignette roja pulsante ── */
+.defeat-box {
+  position: relative;
+  overflow: hidden;
+}
+
+.defeat-box::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(ellipse at center, transparent 40%, rgba(255,71,87,0.08) 100%);
+  animation: defeatPulse 2s ease-in-out infinite;
+  pointer-events: none;
+}
+
+@keyframes defeatPulse {
+  0%, 100% { opacity: 0.5; }
+  50%       { opacity: 1; }
+}
+
+/* ── Endgame title: animación de entrada más dramática ── */
+.endgame-title span {
+  display: inline-block;
+  animation: titleDrop 0.6s cubic-bezier(0.34, 1.56, 0.64, 1) 0.2s both;
+}
+
+@keyframes titleDrop {
+  from { opacity: 0; transform: translateY(-30px) scale(0.8); }
+  to   { opacity: 1; transform: translateY(0)     scale(1);   }
+}
+
+/* ── Endgame stats: entrada con delay ── */
+.endgame-stats {
+  animation: fadeSlideUp 0.5s ease 0.4s both;
+}
+
+.endgame-buttons {
+  animation: fadeSlideUp 0.5s ease 0.6s both;
+}
+
+@keyframes fadeSlideUp {
+  from { opacity: 0; transform: translateY(16px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+/* ── Glow en carta activa del turno actual (jugador) ── */
+.player-card.can-act {
+  cursor: pointer;
+}
+
+/* ── Glow en carta CPU cuando es turno del guest online ── */
+.cpu-card.can-act {
+  cursor: pointer;
+  border-color: rgba(46,213,115,0.6);
+  animation: canActGlow 2s ease-in-out infinite;
+}
+
+/* ── Daño recibido: flash rojo en la carta ── */
+.battle-card.shake {
+  animation: shakeAnim 0.4s ease, damageFlash 0.4s ease;
+}
+
+@keyframes damageFlash {
+  0%   { filter: brightness(1); }
+  25%  { filter: brightness(2) saturate(0.5); }
+  100% { filter: brightness(1); }
+}
+
+/* ── Bench disabled: pointer-events none + opacidad ── */
+.bench-disabled {
+  opacity: 0.45 !important;
+  cursor: not-allowed !important;
+  pointer-events: none !important;
+}
+
+/* ── Responsive mejorado: móvil ── */
+@media (max-width: 480px) {
+  .battle-card { width: 115px; }
+  .bench-card  { width: 54px; }
+  .card-img-wrap img { max-height: 90px; }
+  .hud-pokemon-name { font-size: 0.85rem; }
+  .hud-bench-count  { display: none; }
+  .action-indicator { display: none; }
+  .endgame-box { padding: 20px 16px; }
+  .endgame-title { font-size: 1.6rem; }
+  .endgame-buttons { flex-direction: column; }
+  .end-btn { width: 100%; text-align: center; }
+  .online-badge { top: 8px; right: 8px; font-size: 0.75rem; padding: 7px 12px; }
+  .action-modal { padding: 16px; }
+  .modal-card-preview img { width: 60px; height: 60px; }
+  .modal-actions { flex-direction: column; }
+  .action-btn { min-width: unset; }
+}
+
+/* ── Responsive: tablet ── */
+@media (min-width: 481px) and (max-width: 768px) {
+  .battle-card { width: 140px; }
+  .bench-card  { width: 62px; }
+  .hud-bench-count { display: none; }
+}
+
+/* ── Overflow prevention ── */
+.board {
+  overflow-x: hidden;
+}
+
+.bench-row {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+}
+
+.bench-row::-webkit-scrollbar { display: none; }
+
+/* ── Turn banner: glow en turno del jugador ── */
+.turn-banner.player-turn .turn-text {
+  text-shadow: 0 0 12px rgba(46,213,115,0.6);
+}
+
+.turn-banner.cpu-turn .turn-text {
+  text-shadow: 0 0 12px rgba(255,71,87,0.5);
+}
+
+/* ── HUD: glow sutil en el turno activo ── */
+.hud-player {
+  transition: box-shadow 0.4s ease, border-color 0.4s ease;
+}
+
+/* Aplicado via [class.my-turn] en el template si se desea — ya funciona con action-indicator */
